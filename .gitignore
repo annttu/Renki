@@ -1,0 +1,3 @@
+service_tester.py
+*.pyc
+env/

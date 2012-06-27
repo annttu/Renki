@@ -1,0 +1,22 @@
+Dokumentaatio tietokannoista
+
+t_customers
+* Jokaista asiakasta varten tähän tauluun lisätään rivi
+* Sisältää tietoja asiakkaasta
+
+t_users
+* Jokaisella asiakkaalla voi olla useampi käyttäjä
+* Käyttäjä voi olla esim. mailbox käyttäjä
+
+
+t_vhosts
+* taulu, johon aliakset referoi
+* sisältää tiedot vhostin omistajasta
+* referoi domainiin
+
+vhosts
+* viewi mitä käyttäjät voi käyttää
+* näyttää käyttäjille vain omat palvelut
+* admineille näytetään kaikkien palvelut
+* insertoidessa customer_id on defaulttina käyttäjän customer_id
+** vain admin voi käyttää jotain muuta customer_id:tä
