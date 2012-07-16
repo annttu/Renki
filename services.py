@@ -3,7 +3,7 @@
 from sqlalchemy import *
 from sqlalchemy import event
 from sqlalchemy.pool import Pool
-from sqlalchemy.orm import mapper, sessionmaker
+from sqlalchemy.orm import mapper, sessionmaker, relationship
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
@@ -26,15 +26,25 @@ class DoesNotExist(Exception):
     def __str__(self):
         return "%s" % self.value
 
+class PermissionDenied(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return "%s" % self.value
+
 def on_connect_listener(target, context):
-    print("Reconnecting to database...")
+    log = logging.getLogger('services')
+    log.debug("Reconnecting to database...")
 
 def on_first_connect_listener(target, context):
-    print("Connecting to database...")
+    log = logging.getLogger('services')
+    log.info("Connecting to database...")
 
 class Services():
-    def __init__(self, username, password, server, verbose=False):
+    def __init__(self, username, password, server, verbose=False, database='services'):
         self.db = None
+        self.database = database
         self.db_username = username
         self.db_password = password
         self.server=server
@@ -56,7 +66,7 @@ class Services():
 
 
     def connect(self, database=None,user=None,password=None,server=None, port=None):
-        self.db = create_engine('postgresql://%s:%s@%s' % (self.db_username, self.db_password, self.server),
+        self.db = create_engine('postgresql://%s:%s@%s/%s' % (self.db_username, self.db_password, self.server, self.database),
                                 encoding='utf-8', echo=self.verbose, pool_recycle=60)
 
     def getSession(self):
@@ -67,38 +77,84 @@ class Services():
             event.listen(Pool, 'first_connect', on_first_connect_listener)
             domains = Table('domains', metadata,
                 Column("t_domains_id", Integer, primary_key=True), autoload=True)
-            mapper(self.Domain, domains)
-            users = Table('users', metadata,
-                Column("t_users_id", Integer, primary_key=True), autoload=True)
-            mapper(self.Users, users)
+            mapper(self.Domains, domains)
             customers = Table('customers', metadata,
                 Column("t_customers_id", Integer, primary_key=True), autoload=True)
             mapper(self.Customers, customers)
+            users = Table('users', metadata,
+                Column("t_users_id", Integer, primary_key=True),
+                Column("t_customers_id", Integer, ForeignKey('customers.t_customers_id')),
+                Column("t_domains_id", Integer, ForeignKey('domains.t_domains_id')),
+                autoload=True)
+            mapper(self.Users, users, properties={
+                'customer': relationship(self.Customers, backref='users'),
+                'domain': relationship(self.Domains, backref='users')
+                })
             vhosts = Table('vhosts', metadata,
-                Column("t_vhosts_id", Integer, primary_key=True), autoload=True)
-            mapper(self.Vhost, vhosts)
+                Column("t_vhosts_id", Integer, primary_key=True),
+                Column("t_customers_id", Integer, ForeignKey('customers.t_customers_id')),
+                Column("t_domains_id", Integer, ForeignKey('domains.t_domains_id')),
+                Column("t_users_id", Integer, ForeignKey('users.t_users_id')),
+                autoload=True)
+            mapper(self.Vhosts, vhosts, properties={
+                'customer': relationship(self.Customers, backref='vhosts'),
+                'domain': relationship(self.Domains, backref='vhosts'),
+                'user': relationship(self.Users, backref='vhosts')
+                })
             vhost_aliases = Table('vhost_aliases', metadata,
-                Column("t_vhosts_id", Integer, primary_key=True), autoload=True)
-            mapper(self.Vhost_aliases, vhost_aliases)
+                Column("t_vhosts_id", Integer, primary_key=True),
+                Column("parent_id", Integer, ForeignKey('vhosts.t_vhosts_id')),
+                autoload=True)
+            mapper(self.Vhost_aliases, vhost_aliases, properties={
+                'vhost': relationship(self.Vhosts, backref='vhost_aliases')
+            })
             vhost_redirects = Table('vhost_redirects', metadata,
-                Column("t_vhosts_id", Integer, primary_key=True), autoload=True)
-            mapper(self.Vhost_redirects, vhost_redirects)
+                Column("t_vhosts_id", Integer, primary_key=True),
+                Column("parent_id", Integer, ForeignKey('vhosts.t_vhosts_id')),
+                autoload=True)
+            mapper(self.Vhost_redirects, vhost_redirects, properties={
+                'vhost': relationship(self.Vhosts, backref='vhost_redirects')
+            })
             mailbox = Table('mailboxes', metadata,
-                Column("t_mailboxes_id", Integer, primary_key=True), autoload=True)
-            mapper(self.Mailbox, mailbox)
+                Column("t_mailboxes_id", Integer, primary_key=True),
+                Column("t_domains_id", Integer, ForeignKey('domains.t_domains_id')),
+                Column("t_customers_id", Integer, ForeignKey('customers.t_customers_id')),
+                autoload=True)
+            mapper(self.Mailboxes, mailbox, properties={
+                'customer': relationship(self.Customers, backref='mailboxes'),
+                'domain': relationship(self.Domains, backref='mailboxes')
+            })
             mail_aliases = Table('mail_aliases', metadata,
-                Column('t_mail_aliases_id', Integer, primary_key=True), autoload=True)
-            mapper(self.Mail_aliases, mail_aliases)
+                Column('t_mail_aliases_id', Integer, primary_key=True),
+                Column("t_domains_id", Integer, ForeignKey('domains.t_domains_id')),
+                Column("t_customers_id", Integer, ForeignKey('customers.t_customers_id')),
+                Column("t_mailboxes_id", Integer, ForeignKey('mailboxes.t_mailboxes_id')),
+                autoload=True)
+            mapper(self.Mail_aliases, mail_aliases, properties={
+                'customer': relationship(self.Customers, backref='mail_aliases'),
+                'domain': relationship(self.Domains, backref='mail_aliases'),
+                'mailbox': relationship(self.Mailboxes, backref='mail_aliases')
+            })
             user_ports = Table('user_ports', metadata,
                 Column('t_user_ports_id', Integer, primary_key=True),
-                Column('active', Boolean, default=True), autoload=True)
-            mapper(self.User_ports, user_ports)
+                Column('active', Boolean, default=True),
+                Column("t_customers_id", Integer, ForeignKey('customers.t_customers_id')),
+                Column("t_users_id", Integer, ForeignKey('users.t_users_id')),
+                autoload=True)
+            mapper(self.User_ports, user_ports, properties={
+                'customer': relationship(self.Customers, backref='user_ports'),
+                'user': relationship(self.Users, backref='user_ports'),
+            })
             user_port_servers = Table('user_port_servers', metadata,
                 Column("t_services_id", Integer, primary_key=True), autoload=True)
             mapper(self.User_port_servers, user_port_servers)
             databases = Table('databases', metadata,
-                Column("t_databases_id", Integer, primary_key=True), autoload=True)
-            mapper(self.Databases, databases)
+                Column("t_databases_id", Integer, primary_key=True),
+                Column("t_customers_id", Integer, ForeignKey('customers.t_customers_id')),
+                autoload=True)
+            mapper(self.Databases, databases, properties={
+                'customer': relationship(self.Customers, backref='databases')
+            })
             database_servers = Table('database_servers', metadata,
                 Column("t_services_id", Integer, primary_key=True), autoload=True)
             mapper(self.Database_servers, database_servers)
@@ -106,11 +162,59 @@ class Services():
             self.session = Session()
             self.admin_user = self.is_admin(self.username)
             event.listen(Pool, 'connect', on_connect_listener)
-        except OperationalError:
+        except OperationalError as e:
+            self.log.exception(e)
             self.session = None
 
     def reconnect(self):
         self.session.rollback()
+
+    ###########
+    ## Users ##
+    ###########
+
+    def require_admin(self):
+        if self.is_admin(self.db_username) is False:
+            raise PermissionDenied('Insufficient permissions')
+        return True
+
+    def list_users(self):
+        """List all users"""
+        users = self.session.query(self.Users)
+        try:
+            users = users.all()
+            self.session.commit()
+            return users
+        except Exception as e:
+            self.log.exception(e)
+            self.session.rollback()
+            raise RuntimeError('Cannot get users')
+        except:
+            self.session.rollback()
+            raise RuntimeError('Cannot get users')
+
+    def get_current_user(self):
+        """Get current selected user
+        Raises DoesNotExist if no user found
+        Raises RuntimeError on error"""
+        if self.customer_id != None and self.username != None:
+            user = self.session.query(self.Users).filter(self.Users.customers_id == self.customer_id)
+            user = user.filter(self.Users.name == self.username)
+            try:
+                user = user.one()
+                self.session.commit()
+                return user
+            except NoResultsFound:
+                raise DoesNotExist('No user %s found' % self.username)
+            except Exception as e:
+                self.log.exception(e)
+                self.session.rollback()
+                raise RuntimeError('Cannot get current user, database error')
+            except:
+                self.session.rollback()
+                raise RuntimeError('Cannot get current user, database error')
+        else:
+            raise RuntimeError('Select user first')
 
     def is_admin(self,username=None):
         """Test if user is admin user"""
@@ -167,7 +271,6 @@ class Services():
             self.log.error('Unknown error while getting aliases list')
             raise RuntimeError('Cannot get aliass list')
 
-
     def get_username(self):
         """Get username by t_customers_id"""
         if not self.customer_id:
@@ -193,9 +296,9 @@ class Services():
     def list_domains(self):
         """List user all domains"""
         try:
-            res = self.session.query(self.Domain)
+            res = self.session.query(self.Domains)
             if self.customer_id:
-                res = res.filter(self.Domain.t_customers_id==self.customer_id)
+                res = res.filter(self.Domains.t_customers_id==self.customer_id)
                 return res.all()
         except DatabaseError as e:
             raise RuntimeError(e)
@@ -211,9 +314,9 @@ class Services():
                 domain = "%s.%s" % (name.pop(), domain)
             else:
                 domain = name.pop()
-            search = self.session.query(self.Domain).filter(self.Domain.name == domain)
+            search = self.session.query(self.Domains).filter(self.Domains.name == domain)
             if self.customer_id:
-                search = search.filter(self.Domain.t_customers_id==self.customer_id)
+                search = search.filter(self.Domains.t_customers_id==self.customer_id)
             search = search.all()
             if len(search) == 1:
                 return search[0]
@@ -224,7 +327,7 @@ class Services():
                     domain_type='master', refresh_time=None, retry_time=None,
                     expire_time=None, minimum_cache_time=None, ttl=None):
         """add domain for user"""
-        new = self.Domain()
+        new = self.Domains()
         new.t_customers_id = self.customer_id
         new.name = domain
         new.shared = shared
@@ -341,7 +444,7 @@ class Services():
                 raise RuntimeError('Domain for redirect %s not found' % redirect)
         if not self.username or self.username == '':
             raise RuntimeError('Select username first!')
-        vhost = self.Vhost()
+        vhost = self.Vhosts()
         vhost.username = self.username
         vhost.aliases = aliases
         vhost.redirects = redirects
@@ -387,11 +490,11 @@ class Services():
         all = don't limit results to current user vhosts
         """
         try:
-            vhost = self.session.query(self.Vhost).filter(self.Vhost.name == addr)
+            vhost = self.session.query(self.Vhosts).filter(self.Vhosts.name == addr)
             if self.customer_id and not getall:
-                vhost = vhost.filter(self.Vhost.t_customers_id == self.customer_id)
+                vhost = vhost.filter(self.Vhosts.t_customers_id == self.customer_id)
             if self.username and not getall:
-                vhost = vhost.filter(self.Vhost.username == self.username)
+                vhost = vhost.filter(self.Vhosts.username == self.username)
             retval = vhost.one()
             self.session.commit()
             return retval
@@ -399,11 +502,11 @@ class Services():
             self.session.rollback()
             pass
         try:
-            vhost = self.session.query(self.Vhost).filter(':alias = ANY (aliases)').params(alias=addr)
+            vhost = self.session.query(self.Vhosts).filter(':alias = ANY (aliases)').params(alias=addr)
             if self.customer_id and not getall:
-                vhost = vhost.filter(self.Vhost.t_customers_id == self.customer_id)
+                vhost = vhost.filter(self.Vhosts.t_customers_id == self.customer_id)
             if self.username and not getall:
-                vhost = vhost.filter(self.Vhost.username == self.username)
+                vhost = vhost.filter(self.Vhosts.username == self.username)
             retval = vhost.one()
             self.session.commit()
             return retval
@@ -411,11 +514,11 @@ class Services():
             self.session.rollback()
             pass
         try:
-            vhost = self.session.query(self.Vhost).filter(':alias = ANY (redirects)').params(alias=addr)
+            vhost = self.session.query(self.Vhosts).filter(':alias = ANY (redirects)').params(alias=addr)
             if self.customer_id and not getall:
-                vhost = vhost.filter(self.Vhost.t_customers_id == self.customer_id)
+                vhost = vhost.filter(self.Vhosts.t_customers_id == self.customer_id)
             if self.username and not getall:
-                vhost = vhost.filter(self.Vhost.username == self.username)
+                vhost = vhost.filter(self.Vhosts.username == self.username)
             retval = vhost.one()
             self.session.commit()
             return retval
@@ -428,13 +531,13 @@ class Services():
             """Get all user vhost objects
             domain = (optional) limit search to this domain
             """
-            vhosts = self.session.query(self.Vhost)
+            vhosts = self.session.query(self.Vhosts)
             if self.customer_id:
-                vhosts = vhosts.filter(self.Vhost.t_customers_id == self.customer_id)
+                vhosts = vhosts.filter(self.Vhosts.t_customers_id == self.customer_id)
             if domain:
                 try:
                     dom = self.get_domain(domain)
-                    vhosts = vhosts.filter(self.Vhost.t_domains_id == dom.t_domains_id)
+                    vhosts = vhosts.filter(self.Vhosts.t_domains_id == dom.t_domains_id)
                 except DoesNotExist as e:
                     raise RuntimeError(e)
             retval = vhosts.all()
@@ -485,15 +588,15 @@ class Services():
         domain = (optional) limit mailboxes to this domain
         Returns list of mailbox objects
         Returns RuntimeError if domain not found"""
-        query = self.session.query(self.Mailbox)
+        query = self.session.query(self.Mailboxes)
         if self.customer_id:
-            query = query.filter(self.Mailbox.t_customers_id==self.customer_id)
+            query = query.filter(self.Mailboxes.t_customers_id==self.customer_id)
         if domain:
             try:
                 dom = self.get_domain(domain)
             except DoesNotExist as e:
                 raise RuntimeError(e)
-            query = query.filter(self.Mailbox.t_domains_id == dom.t_domains_id)
+            query = query.filter(self.Mailboxes.t_domains_id == dom.t_domains_id)
         retval = query.all()
         self.session.commit()
         return retval
@@ -502,9 +605,9 @@ class Services():
         """Get one mailbox
         address = mailbox address"""
         try:
-            query = self.session.query(self.Mailbox).filter(self.Mailbox.name == address)
+            query = self.session.query(self.Mailboxes).filter(self.Mailboxes.name == address)
             if self.customer_id:
-                query = query.filter(self.Mailbox.t_customers_id == self.customer_id)
+                query = query.filter(self.Mailboxes.t_customers_id == self.customer_id)
             retval = query.one()
             self.session.commit()
             return retval
@@ -527,7 +630,7 @@ class Services():
         if self.check_email_address(address) != True:
             RuntimeError('Invalid email address "%s" given' % address)
         try:
-            print ("get_mailbox: %s" % self.get_mailbox(address))
+            self.get_mailbox(address)
             raise RuntimeError('Mailbox %s already exist' % address)
         except DoesNotExist:
             pass
@@ -546,7 +649,7 @@ class Services():
         except DoesNotExist:
             pass
 
-        mailbox = self.Mailbox()
+        mailbox = self.Mailboxes()
         mailbox.name = address
         mailbox.t_customers_id = self.customer_id
         mailbox.aliases = aliases
@@ -612,7 +715,7 @@ class Services():
                 aliases.append(a)
         aliases.append(alias)
         mailbox.aliases = aliases
-        print("Aliases: %s" % mailbox.aliases)
+        #print("Aliases: %s" % mailbox.aliases)
         try:
             self.session.commit()
         except IntegrityError as e:
@@ -743,16 +846,58 @@ class Services():
                 return True
         raise RuntimeError('No alias found for database %s' % alias)
 
-    ### mysql database ###
+    def valid_sql_dbtype(self,dbtype):
+        """Check if <dbtype> is valid sql database type"""
+        if dbtype in ['MYSQL','POSTGRESQL']:
+            return True
+        return False
 
-    def list_mysql_databases(self):
+    def get_sql_database(self,server,database, dbtype):
+        """Get user's <dbtype> <database> on <server>
+        return database object on success
+        raise DoesNotExist if does not exist
+        raise RuntimeError on database error"""
+        serv = self.get_sql_server(server,dbtype)
+        query = self.session.query(self.Databases).filter(self.Databases.server==serv.server)
+        query = query.filter(self.Databases.database_name == str(database))
+        if not self.valid_sql_dbtype(dbtype):
+            raise RuntimeError('Invalid database type %s' % dbtype)
+        if self.customer_id:
+            query = query.filter(self.Databases.t_customers_id==self.customer_id)
+        else:
+            self.require_admin()
+        try:
+            query = query.filter(self.Databases.database_type==dbtype).filter(self.Databases.database_name == database)
+            query = query.filter(self.Databases.server == serv.server)
+            retval = query.one()
+            self.session.commit()
+            return retval
+        except NoResultFound:
+            self.session.rollback()
+            raise DoesNotExist('Database %s does not exist' % database)
+        except OperationalError as e:
+            self.log.exception(e)
+            self.session.rollback()
+            raise RuntimeError('Database error %s' % e)
+        except IntegrityError as e:
+            self.session.rollback()
+            self.log.error('Cannot get database, got error %s' % e)
+            self.log.exception(e)
+            raise RuntimeError('Database error %s' % e)
+
+    def list_sql_databases(self, dbtype):
         """List all user's databases
         returns list of database objects
         raises RuntimeError on error"""
+        if not self.valid_sql_dbtype(dbtype):
+            raise RuntimeError('Invalid database type %s' % dbtype)
         query = self.session.query(self.Databases)
         if self.customer_id:
             query = query.filter(self.Databases.t_customers_id==self.customer_id)
+        else:
+            self.require_admin()
         try:
+            query = query.filter(self.Databases.database_type==dbtype)
             retval = query.all()
             self.session.commit()
             return retval
@@ -766,35 +911,8 @@ class Services():
             self.log.exception(e)
             raise RuntimeError('Database error %s' % e)
 
-    def get_mysql_database(self,server,database):
-        """Get user's mysql <database> on <server>
-        return database object on success
-        raise DoesNotExist if does not exist
-        raise RuntimeError on database error"""
-        serv = self.get_mysql_server(server)
-        query = self.session.query(self.Databases).filter(self.Databases.server==serv.server)
-        query = query.filter(self.Databases.database_name == str(database))
-        if self.customer_id:
-            query = query.filter(self.Databases.t_customers_id==self.customer_id)
-        try:
-            retval = query.one()
-            self.session.commit()
-            return retval
-        except NoResultFound:
-            self.session.rollback()
-            raise DoesNotExist('Mysql database %s does not exist' % name)
-        except OperationalError as e:
-            self.log.exception(e)
-            self.session.rollback()
-            raise RuntimeError('Database error %s' % e)
-        except IntegrityError as e:
-            self.session.rollback()
-            self.log.error('Cannot get database, got error %s' % e)
-            self.log.exception(e)
-            raise RuntimeError('Database error %s' % e)
-
-    def add_mysql_database(self,server,database):
-        """Add mysql <database> to server <server> for user"""
+    def add_sql_database(self,server,database,dbtype):
+        """Add <database> type <dbtype> to server <server> for user"""
         # check database name validity
         if self.customer_id is None:
             raise RuntimeError('Cannot add database whitout customer_id')
@@ -802,24 +920,32 @@ class Services():
         for char in str(database):
             if char not in 'abcdefghijklmnopqrstuvwxyz0123456789_':
                 raise RuntimeError('Database name %s contains unvalid chars, allowed chars 0-9,a-z and _' % database)
-        serv = self.get_mysql_server(server)
+        dbtype = dbtype.upper()
+        if not self.valid_sql_dbtype(dbtype):
+            raise RuntimeError('Invalid database type %s' % dbtype)
+        try:
+            serv = self.get_sql_server(server, dbtype)
+        except DoesNotExist:
+            raise RuntimeError('Cannot find database server %s for %s database' % (server, dbtype))
         # require alias
         self.require_database_alias(database)
 
-        db = self.Database()
+        db = self.Databases()
         db.username = database
         db.database_name = database
         db.server = server
-        db.database_type = 'MYSQL'
+        db.database_type = dbtype
         db.approved = True
         db.t_customers_id = self.customer_id
 
-    def del_mysql_database(self,server,database):
-        """Delete mysql <database> on <server>
+    def del_sql_database(self,server,database,dbtype):
+        """Delete <dbype> <database> on <server>
         Used as lazy operation, server removes"""
+        if not self.valid_sql_dbtype(dbtype):
+            raise RuntimeError('Invalid database type %s' % dbtype)
         if self.customer_id is None:
             raise RuntimeError('Select user first')
-        serv = self.get_mysql_server(server)
+        serv = self.get_sql_server(server,dbtype)
         db = self.get_mysql_database(server,database)
         self.session.delete(db)
         try:
@@ -832,45 +958,83 @@ class Services():
             self.log.error('Cannot delete mysql database %s on %s' % (database, server))
             raise RuntimeError('Cannot delete mysql database %s on %s' % (database, server))
 
-
-    def list_mysql_servers(self):
+    def get_sql_server(self,server,dbtype):
         """Get list of mysql servers"""
+        if not self.valid_sql_dbtype(dbtype):
+            raise RuntimeError('Invalid database type %s' % dbtype)
         try:
-            retval = self.session.query(self.Database_servers).all()
-            self.session.commit()
-            return retval
-        except IntegrityError as e:
-            self.session.rollback()
-            self.log.exception(e)
-            self.log.error('Cannot get mysql server list')
-            raise RuntimeError('Cannot get mysql server list')
-        except OperationalError as e:
-            self.session.rollback()
-            self.reconnect()
-            self.log.exception(e)
-            self.log.error('Cannot get mysql server list')
-            raise RuntimeError('Cannot get mysql server list')
-
-    def get_mysql_server(self,server):
-        """Get list of mysql servers"""
-        try:
-            retval = self.session.query(self.Database_servers).filter(self.Database_servers.server==server).one()
+            retval = self.session.query(self.Database_servers).filter(self.Database_servers.server==server)
+            retval = retval.filter(self.Databases.database_type == dbtype).one()
             self.session.commit()
             return retval
         except NoResultFound:
             self.session.rollback()
-            raise DoesNotFound('Mysql server %s does not exist' % server)
+            raise DoesNotFound('Database server %s does not exist' % server)
         except IntegrityError as e:
             self.session.rollback()
             self.log.exception(e)
-            self.log.error('Cannot get mysql server list')
-            raise RuntimeError('Cannot get mysql server list')
+            self.log.error('Cannot get database server %s' % server)
+            raise RuntimeError('Cannot get database server %s' % server)
         except OperationalError as e:
             self.session.rollback()
             self.reconnect()
             self.log.exception(e)
-            self.log.error('Cannot get mysql server list')
-            raise RuntimeError('Cannot get mysql server list')
+            self.log.error('Cannot get database server %s' % server)
+            raise RuntimeError('Cannot get database server %s' % server)
+
+    def list_sql_servers(self,dbtype):
+        """Get list of <dbtype> servers"""
+        if not self.valid_sql_dbtype(dbtype):
+            raise RuntimeError('Invalid database type %s' % dbtype)
+        try:
+            retval = self.session.query(self.Database_servers).filter(self.Database_servers.database_type==dbtype).all()
+            self.session.commit()
+            return retval
+        except IntegrityError as e:
+            self.session.rollback()
+            self.log.exception(e)
+            self.log.error('Cannot get database server list')
+            raise RuntimeError('Cannot get database server list')
+        except OperationalError as e:
+            self.session.rollback()
+            self.reconnect()
+            self.log.exception(e)
+            self.log.error('Cannot get mysql database list')
+            raise RuntimeError('Cannot get database server list')
+
+    ### mysql database ###
+
+    def list_mysql_databases(self):
+        """List all user's databases
+        returns list of database objects
+        raises RuntimeError on error"""
+        return self.list_sql_databases('MYSQL')
+
+    def get_mysql_database(self,server,database):
+        """Get user's mysql <database> on <server>
+        return database object on success
+        raise DoesNotExist if does not exist
+        raise RuntimeError on database error"""
+        return self.get_sql_database(server,database,'MYSQL')
+
+    def add_mysql_database(self,server,database):
+        """Add mysql <database> to server <server> for user"""
+        # check database name validity
+        return self.add_mysql_database(self,server,database,'MYSQL')
+
+    def del_mysql_database(self,server,database):
+        """Delete mysql <database> on <server>
+        Used as lazy operation, server removes"""
+        return self.del_sql_database(self,server,database,'MYSQL')
+
+
+    def list_mysql_servers(self):
+        """Get list of mysql servers"""
+        return self.list_sql_servers('MYSQL')
+
+    def get_mysql_server(self,server):
+        """Get list of mysql servers"""
+        return self.get_sql_server(server,'MYSQL')
 
     def __del__(self):
         try:
@@ -879,7 +1043,7 @@ class Services():
             pass
 
 
-    class Domain(object):
+    class Domains(object):
         """Domain object
        object is mapped to the domains view"""
         pass
@@ -887,7 +1051,8 @@ class Services():
 
     class Users(object):
         """Users object
-        mapped to users view"""
+        mapped to users view
+        self.customer contains Customers object"""
         pass
 
     class Customers(object):
@@ -895,7 +1060,7 @@ class Services():
         mapped to customers view"""
         pass
 
-    class Vhost(object):
+    class Vhosts(object):
         """Vhost object
         object mapped to vhosts view"""
         pass
@@ -916,8 +1081,8 @@ class Services():
         pass
 
 
-    class Mailbox(object):
-        """Mailbox object
+    class Mailboxes(object):
+        """Mailboxes object
         object is mapped to the mailboxes view"""
         pass
 

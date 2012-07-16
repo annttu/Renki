@@ -42,7 +42,6 @@ kirjastoja.
 - Saman domainin käyttäjillä on valtaa lisätä itselleen palveluita saman domainin palveluihin.
 
 
-
 == Historia ==
 
 Services tietokanta ja siihen liittyvä Services python kirjasto on

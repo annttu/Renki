@@ -23,22 +23,33 @@ vhosts
 * insertoidessa customer_id on defaulttina käyttäjän customer_id
 ** vain admin voi käyttää jotain muuta customer_id:tä
 
-
-Tables
-======
-
-t_vhosts
-* Dummy vhost table, used to link aliases to same vhost
-* Contains vhost owner data and links vhosts to domains
-
-t_vhosts_aliases
-* Contains aliases for vhosts
+t_user_ports
+* Taulu, joka sisältää tiedon käyttäjien avoimista porteista shell-palvelimilla
+* portit väliltä 40000 - 65536
 
 user_ports
-* First five ports are opened automatically and next 14 with administration approvation
-* port range 40000 - 65536
+* Viewi, missä käyttäjä näkee omat porttinsa.
+* Adminille näkyy kaikkien käyttäjien portit.
+* customers_id oletuksena käyttäjän oma
+* Portti arvotaan public.find_free_port(services_id) funktiolla seuraavaksi vapaaksi portiksi
+
 
 t_change_log 
-* Used to track changes and notify servers
+* Taulu, joka sisältää tiedot tietokantaan tehdyistä muutoksista
+
+services.change_log
+* View, joka on vähän laajennettu näkymä t_change_log:sta
 
 t_customers
+* Taulu sisältää tiedon asiakkaista/jäsenistä
+* Asiakkailla on nimi (yrityksen tai henkilö nimi)
+* Asiakkaaseen kuuluu yksi tai useampi käyttäjä
+
+customers
+* View sisältää tiedon asiakkaasta ja tämän aliaksista
+
+t_aliases
+* Taulu sisältää tiedon asiakkaiden globaalin nimiavaruuden aliaksista
+* Aliaksia käytetään, kun asiakas tarvitsee globaalin nimiavaruuden palveluita (mysql,shell yms)
+  muulla, kuin omalla käyttäjänimellään varustettuna.
+
