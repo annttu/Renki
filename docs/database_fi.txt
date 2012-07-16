@@ -1,0 +1,44 @@
+Dokumentaatio tietokannoista
+
+TODO
+
+t_customers
+* Jokaista asiakasta varten tähän tauluun lisätään rivi
+* Sisältää tietoja asiakkaasta
+
+t_users
+* Jokaisella asiakkaalla voi olla useampi käyttäjä
+* Käyttäjä voi olla esim. mailbox käyttäjä
+
+
+t_vhosts
+* taulu, johon aliakset referoi
+* sisältää tiedot vhostin omistajasta
+* referoi domainiin
+
+vhosts
+* viewi mitä käyttäjät voi käyttää
+* näyttää käyttäjille vain omat palvelut
+* admineille näytetään kaikkien palvelut
+* insertoidessa customer_id on defaulttina käyttäjän customer_id
+** vain admin voi käyttää jotain muuta customer_id:tä
+
+
+Tables
+======
+
+t_vhosts
+* Dummy vhost table, used to link aliases to same vhost
+* Contains vhost owner data and links vhosts to domains
+
+t_vhosts_aliases
+* Contains aliases for vhosts
+
+user_ports
+* First five ports are opened automatically and next 14 with administration approvation
+* port range 40000 - 65536
+
+t_change_log 
+* Used to track changes and notify servers
+
+t_customers

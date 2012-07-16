@@ -6,14 +6,14 @@ GRANT CONNECT ON DATABASE services to admins;
 CREATE SCHEMA services;
 alter database services SET search_path TO public,services;
 
-CREATE OR REPLACE FUNCTION public.is_admin() RETURNS bool AS $$
+CREATE OR REPLACE FUNCTION public.is_admin(username text) RETURNS bool AS $$
 DECLARE
     adm bool;
 BEGIN
     FOR adm IN SELECT true
                 FROM pg_roles
                 JOIN pg_group ON pg_roles.oid IN (SELECT unnest(grolist))
-                WHERE groname = 'admins' AND pg_roles.rolname = CURRENT_USER LIMIT 1
+                WHERE groname = 'admins' AND pg_roles.rolname = username LIMIT 1
         LOOP
             RETURN adm;
         END LOOP;
@@ -23,6 +23,19 @@ $$ LANGUAGE plpgsql;
 
 GRANT EXECUTE ON FUNCTION public.is_admin() TO users;
 GRANT EXECUTE ON FUNCTION public.is_admin() TO admins;
+
+CREATE OR REPLACE FUNCTION public.is_admin() RETURNS bool AS $$
+DECLARE
+    adm bool;
+BEGIN
+    RETURN public.is_admin(CURRENT_USER);
+END;
+$$ LANGUAGE plpgsql;
+
+GRANT EXECUTE ON FUNCTION public.is_admin() TO users;
+GRANT EXECUTE ON FUNCTION public.is_admin() TO admins;
+
+
 
 -- Function for array comparsions
 
@@ -256,7 +269,7 @@ LANGUAGE 'sql' IMMUTABLE;
 
 
 
-CREATE OR REPLACE FUNCTION public.find_free_port(hosts_id integer)
+CREATE OR REPLACE FUNCTION public.find_free_port(services_id integer)
 RETURNS integer
 AS $$
 DECLARE
@@ -265,21 +278,23 @@ DECLARE
     lower_limit integer = 40000;
     upper_limit integer = 65536;
 BEGIN
-    FOR host_id IN SELECT t_hosts.t_hosts_id FROM services.t_hosts
-                   WHERE hosts_id = t_hosts.t_hosts_id
-                   AND allow_users_add_ports = true LIMIT 1
+    FOR host_id IN SELECT t_services.t_services_id FROM services.t_services
+                   WHERE services_id = t_services.t_services_id
+                   AND t_services.service_type = 'USER_PORTS'
+                   AND t_services.service_category = 'SHELL'
+                   LIMIT 1
         LOOP
         FOR port IN SELECT (t_user_ports.port + 1) AS port
                     FROM services.t_user_ports
                     LEFT JOIN t_user_ports AS t_port ON ( t_user_ports.port + 1 ) = t_port.port
-                    WHERE t_port.port IS NULL AND t_user_ports.t_hosts_id = host_id LIMIT 1
+                    WHERE t_port.port IS NULL AND t_user_ports.t_services_id = services_id LIMIT 1
             LOOP
                 IF port > lower_limit AND port < upper_limit THEN
                     RETURN port;
                 END IF;
             END LOOP;
-        FOR port IN SELECT (MAX(t_user_ports.port) + 1) as max_port FROM services.t_user_ports WHERE t_user_ports.t_hosts_id = host_id
-                    AND (SELECT (MAX(t_user_ports.port) + 1) FROM services.t_user_ports WHERE t_user_ports.t_hosts_id = 1) > lower_limit
+        FOR port IN SELECT (MAX(t_user_ports.port) + 1) as max_port FROM services.t_user_ports WHERE t_user_ports.t_services_id = services_id
+                    AND (SELECT (MAX(t_user_ports.port) + 1) FROM services.t_user_ports WHERE t_user_ports.t_services_id = services_id) > lower_limit
                     LIMIT 1
             LOOP
                 IF port > lower_limit AND port < upper_limit THEN
@@ -473,49 +488,79 @@ BEGIN
     EXECUTE 'CREATE TRIGGER ' || tablename::text || '_log_insert
             AFTER INSERT ON ' || tablen::text || '
             FOR EACH ROW
-            EXECUTE PROCEDURE log_trigger($$' || tablen::text || '$$, $$' || pk::text || '$$)';
+            EXECUTE PROCEDURE log_trigger($$' || pk::text || '$$)';
     EXECUTE 'DROP TRIGGER IF EXISTS ' || tablename::text || '_log_update ON ' || tablen::text;
     EXECUTE 'CREATE TRIGGER ' || tablename::text || '_log_update
             AFTER UPDATE ON ' || tablen::text || '
             FOR EACH ROW
             WHEN (OLD.* IS DISTINCT FROM NEW.*)
-            EXECUTE PROCEDURE log_trigger($$' || tablen::text || '$$, $$' || pk::text || '$$)';
+            EXECUTE PROCEDURE log_trigger($$' || pk::text || '$$)';
     EXECUTE 'DROP TRIGGER IF EXISTS ' || tablename::text || '_log_delete ON ' || tablen::text;
     EXECUTE 'CREATE TRIGGER ' || tablename::text || '_log_delete
-            AFTER DELETE ON ' || tablen::text || '
+            BEFORE DELETE ON ' || tablen::text || '
             FOR EACH ROW
-            EXECUTE PROCEDURE log_trigger($$' || tablen::text || '$$, $$' || pk::text || '$$)';
+            EXECUTE PROCEDURE log_trigger($$' || pk::text || '$$)';
 END;
 $f$ LANGUAGE plpgsql;
 
 DROP FUNCTION IF EXISTS services.log_trigger();
-CREATE function services.log_trigger()
+CREATE OR REPLACE function services.log_trigger()
     RETURNS TRIGGER
 AS $t$
 DECLARE
-    tablen text;
-    pk text;
+    pk TEXT;
+    t text;
 BEGIN
-    tablen := TG_ARGV[0];
-    pk := TG_ARGV[1];
     IF (TG_OP = 'INSERT') THEN
+        EXECUTE 'SELECT ($1).' || TG_ARGV[0] || '::text' INTO t USING NEW;
         EXECUTE 'INSERT INTO t_change_log
-                (table_ref, data_id, event_type)
-                VALUES ($$' || tablen || '$$::regclass::oid, NEW.' || pk::text || ', $$INSERT$$)';
+                (table_ref, data_id, event_type, username)
+                VALUES ($$' || TG_TABLE_NAME || '$$::regclass::oid, $$' || t || '$$, $$' || TG_OP || '$$, $$' || session_user || '$$)';
         RETURN NEW;
     ELSIF (TG_OP = 'UPDATE') THEN
+        EXECUTE 'SELECT ($1).' || TG_ARGV[0] || '::text' INTO t USING NEW;
         EXECUTE 'INSERT INTO t_change_log
-                (table_ref, data_id, event_type)
-                VALUES ($$' || tablen || '$$::regclass::oid, OLD.' || pk::text || ', $$UPDATE$$)';
+                (table_ref, data_id, event_type, username)
+                VALUES ($$' || TG_TABLE_NAME || '$$::regclass::oid, $$' || t || '$$ , $$' || TG_OP || '$$, $$' || session_user || '$$)';
         RETURN NEW;
     ELSIF (TG_OP = 'DELETE') THEN
+        EXECUTE 'SELECT ($1).' || TG_ARGV[0] || '::text' INTO t USING OLD;
         EXECUTE 'INSERT INTO t_change_log
-                (table_ref, data_id, event_type)
-                VALUES ($$' || tablen || '$$::regclass::oid, OLD.' || pk::text || ', $$DELETE$$)';
+                (table_ref, data_id, event_type, username)
+                VALUES ($$' || TG_TABLE_NAME || '$$::regclass::oid, $$' || t || '$$, $$' || TG_OP || '$$, $$' || session_user || '$$)';
         RETURN OLD;
     END IF;
 END;
-$t$ LANGUAGE plpgsql;
+$t$ LANGUAGE plpgsql
+SECURITY DEFINER;
+
+DROP FUNCTION IF EXISTS services.ip_on_subnet(inet, integer);
+CREATE FUNCTION services.ip_on_subnet(ip inet, subnet_id integer)
+RETURNS BOOLEAN
+AS $f$
+DECLARE
+    isin boolean;
+BEGIN
+    isin := (t_subnets.address >> ip::inet) FROM t_subnets WHERE t_subnets.t_subnets_id = subnet_id;
+    IF isin IS true OR isin IS false THEN
+        RETURN isin;
+    END IF;
+    RAISE EXCEPTION 'Subnet % not found', subnet_id;
+END;
+$f$ LANGUAGE plpgsql;
+
+DROP FUNCTION public.valid_database_name(text);
+CREATE FUNCTION public.valid_database_name(database text)
+RETURNS BOOLEAN
+AS
+$f$
+DECLARE
+    regex text;
+BEGIN
+    regex := '^' || CURRENT_USER::text || '(_[a-z0-9_]+)?$';
+    RETURN database ~* regex;
+END;
+$f$ LANGUAGE plpgsql;
 
 --
 -- Functios end
@@ -523,11 +568,12 @@ $t$ LANGUAGE plpgsql;
 
 -- CREATE TYPES --
 
-CREATE TYPE database_type AS ENUM('PGSQL','MYSQL','OTHER');
 CREATE TYPE t_change_log_event_type AS ENUM ('INSERT', 'UPDATE', 'DELETE');
 CREATE type domain_type AS enum ('master', 'slave', 'none');
 CREATE TYPE event_type AS ENUM ('INSERT','UPDATE', 'DELETE');
 CREATE TYPE t_hosts_type AS ENUM ('HARDWARE', 'VIRTUAL');
+CREATE TYPE service_category AS ENUM ('DATABASE', 'MAIL', 'WWW', 'SHELL', 'OTHER');
+CREATE TYPE service_type AS ENUM ('VHOST','MAIL','MAILLIST','JABBER','WORDPRESS','USER_PORTS','SHELL','POSTGRESQL','MYSQL');
 
 ------------------
 -- t_change_log --
@@ -551,10 +597,10 @@ ON INSERT TO services.t_change_log
 DO ALSO
 NOTIFY sqlobjectupdate;
 
-CREATE VIEW services.change_log
+CREATE OR REPLACE VIEW services.change_log
 AS
 SELECT t_change_log.t_change_log_id, t_change_log.created, t_change_log.table_ref, t_change_log.event_type, t_change_log.data_id,
-t_change_log.transaction_id, pg_class.relname as table
+t_change_log.transaction_id, pg_class.relname as table, t_change_log.username as username
 FROM services.t_change_log
 JOIN pg_catalog.pg_class ON (t_change_log.table_ref = pg_class.oid);
 
@@ -571,7 +617,34 @@ CREATE TABLE t_customers (
     closed timestamp with time zone
 );
 
+GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_customers TO admins;
+
 SELECT services.create_log_triggers('services.t_customers');
+
+-- mainly for Kapsi's needs
+
+CREATE TABLE services.t_aliases
+(
+    t_aliases_id serial NOT NULL PRIMARY KEY,
+    t_customers_id integer references t_customers NOT NULL,
+    alias text NOT NULL UNIQUE
+);
+
+SELECT create_log_triggers('services.t_aliases');
+
+GRANT SELECT,UPDATE,INSERT,DELETE ON services.t_aliases TO admins;
+GRANT USAGE ON services.t_aliases_t_aliases_id_seq TO admins;
+
+CREATE OR REPLACE VIEW public.customers AS
+SELECT t_customers.t_customers_id, t_customers.name, array_agg(t_aliases.alias) as aliases
+FROM t_customers
+JOIN t_users USING (t_customers_id)
+LEFT JOIN t_aliases USING (t_customers_id)
+WHERE (t_users.name = CURRENT_USER OR public.is_admin())
+GROUP BY t_customers.t_customers_id;
+
+GRANT SELECT ON public.customers TO users;
+GRANT SELECT ON public.customers TO admins;
 
 -- USERS
 
@@ -584,20 +657,24 @@ CREATE TABLE t_users (
     firstnames text,
     phone text,
     unix_uid integer UNIQUE,
-    password_changed timestamp with time zone DEFAULT now() NOT NULL
+    password_changed timestamp with time zone DEFAULT now() NOT NULL,
+    t_domains_id integer references t_domains NOT NULL
 );
+
+GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_users TO admins;
 
 SELECT create_log_triggers('services.t_users');
 
 CREATE OR REPLACE VIEW public.users AS
-    SELECT t_users.t_customers_id, t_users.name, t_users.lastname, t_users.firstnames, t_users.phone, t_users.unix_id, t_users.t_users_id
+    SELECT t_users.t_customers_id, t_users.name, t_users.lastname, t_users.firstnames, t_users.phone,
+    t_users.unix_id, t_users.t_users_id, t_users.t_domains_id, public.is_admin(t_users.name) as admin
     FROM services.t_users
     WHERE (t_users.name = ("current_user"())::text OR public.is_admin());
 
 GRANT SELECT ON public.users TO users;
+GRANT SELECT ON public.users TO admins;
 
 -- DOMAINS
-
 
 CREATE TABLE t_domains (
     t_domains_id serial NOT NULL PRIMARY KEY,
@@ -725,6 +802,104 @@ ALTER TABLE public.domains ALTER ttl SET DEFAULT 10800;
 ALTER TABLE public.domains ALTER domain_type SET DEFAULT 'master';
 ALTER TABLE public.domains ALTER admin_address SET DEFAULT 'hostmaster@kapsi.fi';
 
+GRANT SELECT,INSERT,UPDATE,DELETE ON domains TO users;
+GRANT SELECT,INSERT,UPDATE,DELETE ON domains TO admins;
+GRANT USAGE ON services.t_domains_t_domains_id_seq TO users;
+GRANT USAGE ON services.t_domains_t_domains_id_seq TO admins;
+
+-------------
+-- subnets --
+-------------
+
+CREATE TABLE services.t_subnets
+(   t_subnets_id serial NOT NULL PRIMARY KEY,
+    name text NOT NULL,
+    location text NOT NULL,
+    info text,
+    vlan_tag integer NOT NULL DEFAULT 0,
+    address inet NOT NULL,
+    gateway inet,
+    dns_servers inet[],
+    dhcp_range inet,
+    dhcp_options text,
+    mtu integer NOT NULL default 1500,
+    hostmaster_address text NOT NULL DEFAULT 'hostmaster@kapsi.fi'::text
+);
+
+ALTER TABLE services.t_subnets ADD CONSTRAINT "vlan_tag_check" CHECK (vlan_tag >= 0 AND vlan_tag <= 65536);
+ALTER TABLE services.t_subnets ADD CONSTRAINT "valid mtu" CHECK (mtu >= 0 AND mtu <= 15500);
+
+SELECT create_log_triggers('services.t_subnets');
+
+------------------------------
+-- Hosts aka. computers etc --
+------------------------------
+
+CREATE TABLE services.t_hosts
+(
+    t_hosts_id serial NOT NULL PRIMARY KEY,
+    name text NOT NULL UNIQUE,
+    type t_hosts_type NOT NULL DEFAULT 'VIRTUAL',
+    t_domains_id integer references t_domains,
+    t_customers_id integer references t_customers
+);
+
+ALTER TABLE services.t_hosts ADD CONSTRAINT valid_name CHECK (name ~* '^[a-z0-9]+$');
+ALTER TABLE services.t_hosts ADD UNIQUE (name, t_domains_id);
+
+SELECT services.create_log_triggers('t_hosts');
+
+----------------
+-- Interfaces --
+----------------
+-- Interfaces and addresses on computers
+
+CREATE TABLE services.t_interfaces
+(
+    t_interfaces_id serial PRIMARY KEY NOT NULL,
+    t_subnets_id integer references t_subnets NOT NULL,
+    ip_address inet NOT NULL,
+    t_domains_id integer references t_domains NOT NULL,
+    name text NOT NULL,
+    t_hosts_id integer REFERENCES t_hosts NOT NULL,
+    info text,
+    active boolean NOT NULL DEFAULT true,
+    mac_address text -- optional
+);
+
+ALTER TABLE services.t_interfaces ADD UNIQUE (t_domains_id, name);
+ALTER TABLE services.t_interfaces ADD CONSTRAINT valid_name CHECK (name ~* '^[a-z0-9\-\._]+$');
+ALTER TABLE services.t_interfaces ADD CONSTRAINT valid_ip CHECK (services.ip_on_subnet(ip_address::inet, t_subnets_id::integer));
+GRANT USAGE ON services.t_interfaces_t_interfaces_id_seq TO admins;
+GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_interfaces TO admins;
+GRANT SELECT ON services.t_interfaces TO servers;
+
+SELECT create_log_triggers('services.t_interfaces');
+
+--------------
+-- Services --
+--------------
+-- Contains services on this environment
+
+CREATE TABLE services.t_services
+(
+    t_services_id serial NOT NULL PRIMARY KEY,
+    t_interfaces_id integer references t_interfaces,
+    service_type service_type NOT NULL,
+    service_category service_category NOT NULL,
+    t_domains_id integer references t_domains NOT NULL,
+    info text,
+    active boolean DEFAULT true NOT NULL,
+    -- can users view this?
+    public boolean DEFAULT false NOT NULL,
+    UNIQUE (t_interfaces_id, service_type, service_category)
+);
+
+GRANT USAGE ON services.t_services_t_services_id_seq TO admins;
+GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_services TO admins;
+GRANT SELECT ON services.t_services TO servers;
+
+SELECT create_log_triggers('services.t_services');
 
 ------------
 -- VHOSTS --
@@ -1130,59 +1305,6 @@ AND ( t_users.name = "current_user"()::text OR public.is_admin())
 ;
 );
 
-GRANT DELETE ON mailboxes TO users;
-
-----------------------------------
--- vlans_id | tag | name | info --
-----------------------------------
-
-CREATE TABLE services.t_vlans
-(t_vlans_id serial PRIMARY KEY NOT NULL,
-tag integer NOT NULL,
-name text NOT NULL,
-info text);
-
-ALTER TABLE t_vlans ADD CONSTRAINT "vlans_id_check" CHECK (tag > 0 AND tag < 65536);
-
-SELECT create_log_triggers('services.t_vlans');
-
--------------
--- subnets --
--------------
-
-CREATE TABLE services.t_subnets
-(   t_subnets_id serial NOT NULL PRIMARY KEY,
-    name text NOT NULL,
-    location text NOT NULL,
-    info text,
-    t_vlans_id integer references t_vlans,
-    address inet NOT NULL
-);
-
-SELECT create_log_triggers('services.t_subnets');
-
-
-------------------------------
--- Hosts aka. computers etc --
-------------------------------
-
-CREATE TABLE services.t_hosts
-(
-    t_hosts_id serial NOT NULL PRIMARY KEY,
-    name text NOT NULL UNIQUE,
-    type t_hosts_type NOT NULL DEFAULT 'VIRTUAL',
-    t_domains_id integer references t_domains,
-    t_customers_id integer references t_customers,
-    allow_users_add_ports boolean NOT NULL DEFAULT false,
-    databases database_type[]
-    -- services maybe many to many relation to t_services table
-    -- not implemented yet
-);
-
-ALTER TABLE services.t_hosts ADD CONSTRAINT valid_name CHECK (name ~* '^[a-z0-9]+$');
-ALTER TABLE services.t_hosts ADD UNIQUE (name, t_domains_id);
-
-SELECT services.create_log_triggers('t_hosts');
 
 ------------------
 -- IP-addresses --
@@ -1220,50 +1342,55 @@ CREATE TABLE services.t_user_ports
     t_users_id integer references t_users NOT NULL,
     port integer NOT NULL,
     info text,
-    t_hosts_id integer references t_hosts NOT NULL,
+    t_services_id integer references t_services NOT NULL,
     approved boolean NOT NULL DEFAULT false,
     active boolean NOT NULL DEFAULT true
 );
 
 ALTER TABLE t_user_ports ADD CONSTRAINT valid_port CHECK ((port > 1024 AND port <= 30000 ) OR ( port >= 40000 AND port < 65536));
-ALTER TABLE t_user_ports ADD UNIQUE (port, t_hosts_id);
+ALTER TABLE t_user_ports ADD UNIQUE (port, t_services_id);
 
 SELECT services.create_log_triggers('t_user_ports');
 
-CREATE OR REPLACE VIEW public.user_port_hosts
+CREATE OR REPLACE VIEW public.user_port_servers
 AS
 SELECT
-t_hosts.t_hosts_id as t_hosts_id,
-public.find_free_port(t_hosts.t_hosts_id) as port,
-t_hosts.name || '.' || t_domains.name as host
-FROM t_hosts
-JOIN t_domains USING (t_domains_id)
-JOIN t_users ON t_users.name = CURRENT_USER
-WHERE t_hosts.allow_users_add_ports = true
-AND t_domains.t_domains_id = t_hosts.t_domains_id;
+t_services.t_services_id as t_services_id,
+public.find_free_port(t_services.t_services_id) as port,
+t_interfaces.name || '.' || t_domains.name as server
+FROM t_services
+JOIN t_interfaces USING (t_interfaces_id)
+JOIN t_domains ON (t_interfaces.t_domains_id = t_domains.t_domains_id)
+JOIN users ON users.name = CURRENT_USER
+JOIN t_customers ON (t_customers.t_customers_id = users.t_customers_id)
+WHERE t_services.service_type = 'USER_PORTS'
+AND t_services.service_category = 'SHELL'
+AND t_services.public = TRUE
+AND t_services.active = TRUE
+AND ( t_services.t_domains_id = users.t_domains_id OR public.is_admin());
 
-GRANT SELECT ON public.user_port_hosts TO users;
+GRANT SELECT ON public.user_port_servers TO users;
+GRANT SELECT ON public.user_port_servers TO admins;
 
 CREATE OR REPLACE VIEW public.user_ports
 AS
 SELECT
 t_user_ports.t_user_ports_id,
 t_user_ports.t_users_id,
-t_customers.t_customers_id,
+t_users.t_customers_id,
 t_users.name as username,
 port,
-t_hosts.name || '.' || t_domains.name as host,
+t_interfaces.name || '.' || t_domains.name as server,
 t_user_ports.info as info,
 t_user_ports.approved,
 t_user_ports.active
 FROM t_user_ports
 JOIN t_users USING (t_users_id)
-JOIN t_customers ON t_users.t_customers_id = t_customers.t_customers_id
-JOIN t_hosts USING (t_hosts_id)
-JOIN t_domains ON t_hosts.t_domains_id = t_domains.t_domains_id
+JOIN t_services USING (t_services_id)
+JOIN t_interfaces ON t_interfaces.t_interfaces_id = t_services.t_interfaces_id
+JOIN t_domains ON t_interfaces.t_domains_id = t_domains.t_domains_id
 WHERE ( t_users.name = CURRENT_USER OR public.is_admin())
-AND t_domains.t_domains_id = t_hosts.t_domains_id
-AND t_user_ports.t_hosts_id = t_hosts.t_hosts_id;
+AND t_user_ports.t_users_id = t_users.t_users_id;
 
 ALTER TABLE public.user_ports ALTER active SET DEFAULT true;
 
@@ -1277,14 +1404,14 @@ AS ON INSERT
 TO public.user_ports
 DO INSTEAD
 INSERT INTO t_user_ports
-(t_users_id, port, t_hosts_id, info, approved, active)
-SELECT users.t_users_id, user_port_hosts.port, user_port_hosts.t_hosts_id, NEW.info,
+(t_users_id, port, t_services_id, info, approved, active)
+SELECT users.t_users_id, user_port_servers.port, user_port_servers.t_services_id, NEW.info,
     (SELECT COUNT(user_ports.t_user_ports_id)
      FROM user_ports, users
      WHERE users.name = CURRENT_USER
      AND user_ports.t_users_id = users.t_users_id) < 5,
 new.active
-FROM users, user_port_hosts
+FROM users, user_port_servers
 WHERE (
         (users.name = CURRENT_USER  AND NOT public.is_admin())
     OR
@@ -1297,13 +1424,14 @@ WHERE (
     )
 )
 AND (SELECT COUNT(user_ports.t_user_ports_id) FROM user_ports, users  WHERE users.name = CURRENT_USER AND user_ports.t_users_id = users.t_users_id) < 20
-AND user_port_hosts.host = NEW.host
+AND user_port_servers.server = NEW.server
 RETURNING t_user_ports_id,t_users_id, (SELECT users.t_customers_id as t_customers_id FROM users WHERE users.t_users_id = t_user_ports.t_users_id),
 (SELECT users.name from users WHERE users.t_users_id = t_user_ports.t_users_id), port,
-(SELECT user_port_hosts.host FROM user_port_hosts WHERE user_port_hosts.t_hosts_id = t_user_ports.t_hosts_id ),
+(SELECT user_port_servers.server FROM user_port_servers WHERE user_port_servers.t_services_id = t_user_ports.t_services_id ),
 t_user_ports.info, t_user_ports.approved, t_user_ports.active;
 
 GRANT INSERT ON user_ports TO users;
+GRANT INSERT ON user_ports TO admins;
 
 CREATE OR REPLACE RULE user_ports_update
 AS ON UPDATE
@@ -1312,15 +1440,21 @@ DO INSTEAD
 (
 UPDATE t_user_ports SET
 active = NEW.active,
-info = NEW.info
+info = NEW.info,
+approved = ((public.is_admin() AND NEW.approved ) OR (OLD.approved))
 FROM t_customers, users
 WHERE t_user_ports.t_user_ports_id = new.t_user_ports_id
 AND t_user_ports.t_users_id = users.t_users_id
 AND t_customers.t_customers_id = users.t_customers_id
-AND ((users.name = CURRENT_USER  AND NOT public.is_admin()) OR (public.is_admin() AND users.t_users_id = OLD.t_users_id));
+AND ((users.name = CURRENT_USER  AND NOT public.is_admin()) OR (public.is_admin() AND users.t_users_id = OLD.t_users_id))
+RETURNING t_user_ports.t_user_ports_id, t_user_ports.t_users_id, (SELECT users.t_customers_id as t_customers_id FROM users WHERE users.t_users_id = t_user_ports.t_users_id),
+(SELECT users.name from users WHERE users.t_users_id = t_user_ports.t_users_id), port,
+(SELECT user_port_servers.server FROM user_port_servers WHERE user_port_servers.t_services_id = t_user_ports.t_services_id ),
+t_user_ports.info, t_user_ports.approved, t_user_ports.active;
 );
 
 GRANT UPDATE ON user_ports TO users;
+GRANT UPDATE ON user_ports TO admins;
 
 CREATE OR REPLACE RULE user_ports_delete
 AS ON DELETE
@@ -1332,31 +1466,159 @@ WHERE t_user_ports.t_user_ports_id = OLD.t_user_ports_id
 AND t_user_ports.t_users_id = t_users.t_users_id
 AND t_users.t_customers_id = t_customers.t_customers_id
 AND (t_users.name = CURRENT_USER OR public.is_admin())
+RETURNING t_user_ports.t_user_ports_id, t_user_ports.t_users_id, (SELECT users.t_customers_id as t_customers_id FROM users WHERE users.t_users_id = t_user_ports.t_users_id),
+(SELECT users.name from users WHERE users.t_users_id = t_user_ports.t_users_id), port,
+(SELECT user_port_servers.server FROM user_port_servers WHERE user_port_servers.t_services_id = t_user_ports.t_services_id ),
+t_user_ports.info, t_user_ports.approved, t_user_ports.active
 );
 
 GRANT DELETE ON user_ports TO users;
+GRANT DELETE ON user_ports TO admins;
 
 ---------------
 -- Databases --
 ---------------
 
 CREATE TABLE services.t_databases
-(   t_databases_id serial PRIMARY KEY NOT NULL,
-    type database_type NOT NULL,
+(
+    t_databases_id serial PRIMARY KEY NOT NULL,
     database_name text NOT NULL,
     username text NOT NULL,
-    t_hosts_id integer references t_hosts NOT NULL,
+    t_services_id integer references t_services NOT NULL,
     t_customers_id integer references t_customers NOT NULL,
     info text,
-    approved boolean DEFAULT FALSE NOT NULL
+    approved boolean DEFAULT FALSE NOT NULL,
+    UNIQUE (database_name, t_services_id)
 );
 
 ALTER TABLE services.t_databases ADD CONSTRAINT valid_database_name CHECK (database_name ~* '^[a-z0-9_]+$');
 ALTER TABLE services.t_databases ADD CONSTRAINT valid_username CHECK (database_name ~* '^[a-z0-9_]+$');
 
+GRANT USAGE ON services.t_databases_t_databases_id_seq TO users;
+GRANT USAGE ON services.t_databases_t_databases_id_seq TO admins;
+GRANT SELECT,UPDATE,DELETE,INSERT ON services.t_databases TO admins;
+GRANT SELECT ON services.t_databases TO users;
 
 -- create log rules
 SELECT services.create_log_triggers('t_databases');
+
+-- Database servers view
+
+DROP VIEW IF EXISTS public.database_servers;
+CREATE OR REPLACE VIEW public.database_servers
+AS
+SELECT t_services_id, t_interfaces.name || '.' || t_domains.name as server,
+t_services.service_type AS database_type, t_services.active
+FROM t_services
+JOIN t_interfaces USING (t_interfaces_id)
+JOIN t_hosts USING (t_hosts_id)
+JOIN t_domains ON t_interfaces.t_domains_id = t_domains.t_domains_id
+JOIN t_users ON CURRENT_USER = t_users.name
+WHERE service_category = 'DATABASE'
+AND t_services.public = True
+AND (t_users.t_domains_id = t_services.t_domains_id OR public.is_admin() = True);
+
+GRANT SELECT ON public.database_servers TO users;
+GRANT SELECT ON public.database_servers TO admins;
+
+-- databases view
+
+DROP VIEW IF EXISTS public.databases;
+CREATE OR REPLACE VIEW public.databases
+AS
+SELECT t_databases.t_databases_id, t_databases.database_name, t_databases.username, t_databases.t_customers_id,
+t_databases.approved, t_services.service_type AS database_type,
+t_interfaces.name || '.' || t_domains.name AS server, t_databases.info
+FROM t_databases
+JOIN t_customers ON t_databases.t_customers_id = t_customers.t_customers_id
+JOIN t_users ON t_users.t_customers_id = t_customers.t_customers_id
+JOIN t_services USING (t_services_id)
+JOIN t_interfaces USING (t_interfaces_id)
+JOIN t_domains ON t_interfaces.t_domains_id = t_domains.t_domains_id
+WHERE (t_users.name = CURRENT_USER OR public.is_admin() = true);
+
+GRANT SELECT ON public.databases TO users;
+GRANT SELECT ON public.databases TO admins;
+
+CREATE OR REPLACE RULE databases_insert
+AS
+ON INSERT TO public.databases
+DO INSTEAD
+(
+INSERT INTO services.t_databases
+    (database_name, username, t_customers_id, info, t_services_id, approved)
+    SELECT NEW.database_name, NEW.username, t_customers.t_customers_id, NEW.info,
+    database_servers.t_services_id,
+    (
+        public.is_admin()
+        OR (
+            public.valid_database_name(NEW.database_name)
+            AND (SELECT COUNT(t_databases_id) FROM databases
+            JOIN users ON (databases.t_customers_id = users.t_customers_id AND users.name = session_user)
+            WHERE databases.t_customers_id = users.t_customers_id
+            ) < 10
+        )
+    )
+    FROM t_customers
+    JOIN database_servers ON (database_servers.active = True)
+    JOIN users ON (t_customers.t_customers_id = users.t_customers_id)
+    WHERE (
+        (users.name = CURRENT_USER  AND NOT public.is_admin() AND users.t_customers_id = t_customers.t_customers_id)
+    OR
+    ( public.is_admin() AND t_customers.t_customers_id = NEW.t_customers_id )
+    )
+    AND NEW.server = database_servers.server
+    AND NEW.database_type = database_servers.database_type
+    AND (
+            SELECT COUNT(t_databases_id) FROM databases
+            WHERE databases.t_customers_id = t_customers.t_customers_id
+    ) < 20
+    RETURNING t_databases.t_databases_id, t_databases.database_name, t_databases.username, t_databases.t_customers_id,
+    t_databases.approved, (SELECT t_services.service_type FROM t_services WHERE t_services.t_services_id = t_databases.t_services_id),
+    (SELECT t_interfaces.name || '.' || t_domains.name
+        FROM t_services
+        JOIN t_interfaces USING (t_interfaces_id)
+        JOIN t_domains ON (t_domains.t_domains_id = t_interfaces.t_domains_id)
+        WHERE t_services.t_services_id = t_databases.t_services_id),
+    t_databases.info;
+);
+
+GRANT INSERT ON databases TO users;
+GRANT INSERT ON databases TO admins;
+
+CREATE OR REPLACE RULE databases_update
+AS ON UPDATE
+TO public.databases
+DO INSTEAD
+(
+UPDATE services.t_databases SET
+info = NEW.info,
+approved = ((public.is_admin() AND NEW.approved) OR OLD.approved)
+FROM t_customers, users
+WHERE t_databases.t_databases_id = new.t_databases_id
+AND t_databases.t_customers_id = t_customers.t_customers_id
+AND t_customers.t_customers_id = users.t_customers_id
+AND ((users.name = CURRENT_USER  AND NOT public.is_admin()) OR (public.is_admin() AND users.t_customers_id = OLD.t_customers_id));
+);
+
+GRANT UPDATE ON databases TO users;
+GRANT UPDATE ON databases TO admins;
+
+CREATE OR REPLACE RULE databases_delete
+AS
+ON DELETE TO public.databases
+DO INSTEAD
+(
+    DELETE FROM t_databases
+    USING t_customers, t_users
+    WHERE t_databases.t_databases_id = OLD.t_databases_id
+    AND t_databases.t_customers_id = t_users.t_customers_id
+    AND t_users.t_customers_id = t_customers.t_customers_id
+    AND (t_users.name = CURRENT_USER OR public.is_admin());
+);
+
+GRANT DELETE ON databases TO users;
+GRANT DELETE ON databases TO admins;
 
 ------------------
 -- Server views --
@@ -1586,15 +1848,16 @@ EXECUTE PROCEDURE t_domains_historize_trigger();
 DROP VIEW IF EXISTS services.s_user_ports;
 CREATE VIEW services.s_user_ports
 AS
-SELECT t_user_ports.t_user_ports_id, t_user_ports.t_users_id, t_user_ports.port, t_user_ports.info, t_user_ports.t_hosts_id,
+SELECT t_user_ports.t_user_ports_id, t_user_ports.t_users_id, t_user_ports.port, t_user_ports.info, t_user_ports.t_services_id,
 t_user_ports.approved, t_user_ports.active, t_users.name, t_users.t_customers_id, t_users.unix_id,
-(t_hosts.name || '.'::text) || t_domains.name AS host
+(t_interfaces.name || '.'::text) || t_domains.name AS server, t_interfaces.t_hosts_id as t_hosts_id
 FROM t_user_ports
 JOIN t_users USING (t_users_id)
 JOIN t_customers ON t_users.t_customers_id = t_customers.t_customers_id
-JOIN t_hosts USING (t_hosts_id)
-JOIN t_domains ON t_hosts.t_domains_id = t_domains.t_domains_id
-WHERE t_user_ports.t_hosts_id = t_hosts.t_hosts_id;
+JOIN t_services USING (t_services_id)
+JOIN t_interfaces ON (t_services.t_interfaces_id = t_interfaces.t_interfaces_id)
+JOIN t_domains ON t_interfaces.t_domains_id = t_domains.t_domains_id
+WHERE t_user_ports.t_services_id = t_services.t_services_id;
 
 GRANT SELECT ON services.s_user_ports TO servers;
 GRANT SELECT ON services.s_user_ports TO admins;

@@ -35,25 +35,28 @@ def on_first_connect_listener(target, context):
 class Services():
     def __init__(self, username, password, server, verbose=False):
         self.db = None
-        self.username = username
-        self.password = password
+        self.db_username = username
+        self.db_password = password
         self.server=server
         self.verbose = verbose
         if self.verbose:
             logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
         else:
             logging.getLogger('sqlalchemy.engine').setLevel(logging.ERROR)
+        self.log = logging.getLogger('services')
         self.connect()
         self.customer_id = None
         self.username = None
         self.session = None
+        self.admin_user = False
         self.getSession()
         if not self.session:
             raise RuntimeError('Invalid login')
-        self.log = logging.getLogger('services')
+        self.db_password = None
+
 
     def connect(self, database=None,user=None,password=None,server=None, port=None):
-        self.db = create_engine('postgresql://%s:%s@%s' % (self.username, self.password, self.server),
+        self.db = create_engine('postgresql://%s:%s@%s' % (self.db_username, self.db_password, self.server),
                                 encoding='utf-8', echo=self.verbose, pool_recycle=60)
 
     def getSession(self):
@@ -65,7 +68,12 @@ class Services():
             domains = Table('domains', metadata,
                 Column("t_domains_id", Integer, primary_key=True), autoload=True)
             mapper(self.Domain, domains)
-            #event.listen(self.Domain, 'load', on_load_listener)
+            users = Table('users', metadata,
+                Column("t_users_id", Integer, primary_key=True), autoload=True)
+            mapper(self.Users, users)
+            customers = Table('customers', metadata,
+                Column("t_customers_id", Integer, primary_key=True), autoload=True)
+            mapper(self.Customers, customers)
             vhosts = Table('vhosts', metadata,
                 Column("t_vhosts_id", Integer, primary_key=True), autoload=True)
             mapper(self.Vhost, vhosts)
@@ -81,21 +89,102 @@ class Services():
             mail_aliases = Table('mail_aliases', metadata,
                 Column('t_mail_aliases_id', Integer, primary_key=True), autoload=True)
             mapper(self.Mail_aliases, mail_aliases)
-            user_port = Table('user_ports', metadata,
+            user_ports = Table('user_ports', metadata,
                 Column('t_user_ports_id', Integer, primary_key=True),
                 Column('active', Boolean, default=True), autoload=True)
-            mapper(self.User_port, user_port)
-            host = Table('hosts', metadata,
-                Column("hosts_id", Integer, primary_key=True), autoload=True)
-            mapper(self.Host, host)
+            mapper(self.User_ports, user_ports)
+            user_port_servers = Table('user_port_servers', metadata,
+                Column("t_services_id", Integer, primary_key=True), autoload=True)
+            mapper(self.User_port_servers, user_port_servers)
+            databases = Table('databases', metadata,
+                Column("t_databases_id", Integer, primary_key=True), autoload=True)
+            mapper(self.Databases, databases)
+            database_servers = Table('database_servers', metadata,
+                Column("t_services_id", Integer, primary_key=True), autoload=True)
+            mapper(self.Database_servers, database_servers)
             Session = sessionmaker(bind=self.db)
             self.session = Session()
+            self.admin_user = self.is_admin(self.username)
             event.listen(Pool, 'connect', on_connect_listener)
         except OperationalError:
             self.session = None
 
     def reconnect(self):
         self.session.rollback()
+
+    def is_admin(self,username=None):
+        """Test if user is admin user"""
+        if username is None:
+            username = self.db_username
+        try:
+            retval = self.session.query(self.Users).filter(self.Users.name == username).one()
+            self.session.commit()
+            return retval.admin
+        except NoResultFound:
+            self.session.rollback()
+            raise DoesNotExist('User %s does not exist' % username)
+        except:
+            self.session.rollback()
+            self.reconnect()
+        try:
+            retval = self.session.query(self.Users).filter(self.Users.name == username).one()
+            self.session.commit()
+            return retval.admin
+        except Exception as e:
+            self.log.exception(e)
+        except:
+            pass
+        raise RuntimeError('Cannot get user %s, database error' % username)
+        return False
+
+    def list_aliases(self,user=None):
+        """List <username> aliases"""
+        query = self.session.query(self.Customers.aliases,self.Users.name).join(self.Users, self.Customers.t_customers_id == self.Users.t_customers_id)
+        if user is not None:
+            query = query.filter(self.Users.name == user)
+        elif self.customers_id is not None:
+            query = query.filter(self.Users.t_customers_id == self.customer_id)
+        else:
+            raise RuntimeError('Give either user or customer_id')
+        try:
+            retval = query.one()
+            user = retval.name
+            retval = [alias for alias in retval.aliases if alias is not None]
+            retval += [user]
+            self.session.commit()
+            return retval
+        except NoResultFound:
+            if user is not None:
+                return DoesNotExist('User %s does not exist' % user)
+            else:
+                return DoesNotExist('Customer %s does not exist' % self.customer_id)
+        except Exception as e:
+            self.log.exception(e)
+            self.session.rollback()
+            raise RuntimeError('Cannot get aliass list')
+        except:
+            self.session.rollback(e)
+            self.log.error('Unknown error while getting aliases list')
+            raise RuntimeError('Cannot get aliass list')
+
+
+    def get_username(self):
+        """Get username by t_customers_id"""
+        if not self.customer_id:
+            raise RuntimeError('Select user first')
+        try:
+            query = self.session.query(self.Users.name).filter(self.Users.t_customers_id == self.customer_id).one()
+        except NoResultFound:
+            raise DoesNotExist('User for customer_id %s does not found' % self.customer_id)
+
+    def require_alias(self,alias):
+        """Check if there is alias row for <alias>"""
+        if self.customer_id is None:
+            raise RuntimeError('Select user first')
+        aliases = self.list_aliases()
+        if alias in aliases:
+            return True
+        raise RuntimeError('Alias %s not found' % alias)
 
     #############
     ## domains ##
@@ -558,9 +647,11 @@ class Services():
     ## User ports ##
 
     def list_user_ports(self):
-        ports = self.session.query(self.User_port)
+        ports = self.session.query(self.User_ports)
         if self.customer_id:
-            ports = ports.filter(self.User_port.t_customers_id==self.customer_id)
+            ports = ports.filter(self.User_ports.t_customers_id==self.customer_id)
+        if self.username:
+            ports = ports.filter(self.User_ports.username == self.username)
         retval = ports.all()
         self.session.commit()
         return retval
@@ -570,33 +661,35 @@ class Services():
             port = int(port)
         except ValueError:
             raise RuntimeError('Port must be integer!')
-        port = self.session.query(self.User_port).filter(self.User_port.host == server, self.User_port.port == port)
+        query = self.session.query(self.User_ports).filter(self.User_ports.server == server, self.User_ports.port == port)
         if self.customer_id:
-            port = port.filter(self.User_port.t_customers_id == self.customer_id)
+            query = query.filter(self.User_ports.t_customers_id == self.customer_id)
+        if self.customer_id:
+            query = query.filter(self.User_ports.username == self.username)
         try:
-            retval = port.one()
+            retval = query.one()
             self.session.commit()
             return retval
         except NoResultFound:
             self.session.rollback()
-            raise RuntimeError('Port %d on server %s not found' % (port, server))
+            raise DoesNotExist('Port %d on server %s not found' % (port, server))
 
     def add_user_port(self, server):
-        """Open port on given server (server)
+        """Open port on given <server>
         Raises RuntimeError if server not found
         Raises RuntimeError on error
         returns opened port
         """
         try:
-           host = self.get_host(server)
+           host = self.get_user_port_server(server)
         except DoesNotExist:
             raise RuntimeError('Server %s does not found!' % server)
         if not self.username or self.username == '':
             raise RuntimeError('Cannot add port without username')
-        port = self.User_port()
+        port = self.User_ports()
         port.t_customers_id = self.customer_id
         port.username = self.username
-        port.host = host.host
+        port.server = host.server
         self.session.add(port)
         try:
             self.session.commit()
@@ -605,10 +698,12 @@ class Services():
             self.log.error('Cannot commit to database %s' % e)
             self.log.exception(e)
             raise RuntimeError('Cannot commit to database %s' % e)
-        #print("vars: %s" % vars(port))
         return port.port
 
     def del_user_port(self, server, port):
+        """Delete <port> on <server>
+        Raises RuntimeError on database error
+        Returns True on successful delete"""
         port = self.get_user_port(server, port)
         try:
             self.session.delete(port)
@@ -618,19 +713,164 @@ class Services():
             self.log.error('Cannot commit to database %s' % e)
             self.log.exception(e)
             raise RuntimeError('Cannot commit to database %s' % e)
-
+        return True
     ### hosts ###
 
-    def get_host(self,host):
+    def get_user_port_server(self,server):
+        """Get shell server object by name
+        Raises RuntimeError on database error
+        Raises NoResultFound if no result found
+        Returns user_port_server object on success"""
         try:
-            retval = self.session.query(self.Host).filter(self.Host.host==host).one()
+            retval = self.session.query(self.User_port_servers).filter(self.User_port_servers.server==server).one()
             self.session.commit()
             return retval
         except NoResultFound:
             self.session.rollback()
-            raise DoesNotExist('Host %s does not exist' % host)
+            raise DoesNotExist('Host %s does not exist' % server)
         except OperationalError:
             self.reconnect()
+            raise RuntimeError('Cannot get server %s' % server)
+
+
+    ### databases ###
+
+    def require_database_alias(self,alias):
+        """Check if there is alias row for <alias>"""
+        aliases = self.list_aliases()
+        for a in aliases:
+            if alias.startswith("%s_" % a) or alias == a:
+                return True
+        raise RuntimeError('No alias found for database %s' % alias)
+
+    ### mysql database ###
+
+    def list_mysql_databases(self):
+        """List all user's databases
+        returns list of database objects
+        raises RuntimeError on error"""
+        query = self.session.query(self.Databases)
+        if self.customer_id:
+            query = query.filter(self.Databases.t_customers_id==self.customer_id)
+        try:
+            retval = query.all()
+            self.session.commit()
+            return retval
+        except OperationalError as e:
+            self.log.exception(e)
+            self.session.rollback()
+            raise RuntimeError('Database error %s' % e)
+        except IntegrityError as e:
+            self.session.rollback()
+            self.log.error('Cannot get databases, got error %s' % e)
+            self.log.exception(e)
+            raise RuntimeError('Database error %s' % e)
+
+    def get_mysql_database(self,server,database):
+        """Get user's mysql <database> on <server>
+        return database object on success
+        raise DoesNotExist if does not exist
+        raise RuntimeError on database error"""
+        serv = self.get_mysql_server(server)
+        query = self.session.query(self.Databases).filter(self.Databases.server==serv.server)
+        query = query.filter(self.Databases.database_name == str(database))
+        if self.customer_id:
+            query = query.filter(self.Databases.t_customers_id==self.customer_id)
+        try:
+            retval = query.one()
+            self.session.commit()
+            return retval
+        except NoResultFound:
+            self.session.rollback()
+            raise DoesNotExist('Mysql database %s does not exist' % name)
+        except OperationalError as e:
+            self.log.exception(e)
+            self.session.rollback()
+            raise RuntimeError('Database error %s' % e)
+        except IntegrityError as e:
+            self.session.rollback()
+            self.log.error('Cannot get database, got error %s' % e)
+            self.log.exception(e)
+            raise RuntimeError('Database error %s' % e)
+
+    def add_mysql_database(self,server,database):
+        """Add mysql <database> to server <server> for user"""
+        # check database name validity
+        if self.customer_id is None:
+            raise RuntimeError('Cannot add database whitout customer_id')
+        database = database.lower()
+        for char in str(database):
+            if char not in 'abcdefghijklmnopqrstuvwxyz0123456789_':
+                raise RuntimeError('Database name %s contains unvalid chars, allowed chars 0-9,a-z and _' % database)
+        serv = self.get_mysql_server(server)
+        # require alias
+        self.require_database_alias(database)
+
+        db = self.Database()
+        db.username = database
+        db.database_name = database
+        db.server = server
+        db.database_type = 'MYSQL'
+        db.approved = True
+        db.t_customers_id = self.customer_id
+
+    def del_mysql_database(self,server,database):
+        """Delete mysql <database> on <server>
+        Used as lazy operation, server removes"""
+        if self.customer_id is None:
+            raise RuntimeError('Select user first')
+        serv = self.get_mysql_server(server)
+        db = self.get_mysql_database(server,database)
+        self.session.delete(db)
+        try:
+            self.session.commit()
+        except Exception as e:
+            self.log.exception(e)
+            self.log.error('Cannot delete mysql database %s on %s' % (database, server))
+            raise RuntimeError('Cannot delete mysql database %s on %s' % (database, server))
+        except:
+            self.log.error('Cannot delete mysql database %s on %s' % (database, server))
+            raise RuntimeError('Cannot delete mysql database %s on %s' % (database, server))
+
+
+    def list_mysql_servers(self):
+        """Get list of mysql servers"""
+        try:
+            retval = self.session.query(self.Database_servers).all()
+            self.session.commit()
+            return retval
+        except IntegrityError as e:
+            self.session.rollback()
+            self.log.exception(e)
+            self.log.error('Cannot get mysql server list')
+            raise RuntimeError('Cannot get mysql server list')
+        except OperationalError as e:
+            self.session.rollback()
+            self.reconnect()
+            self.log.exception(e)
+            self.log.error('Cannot get mysql server list')
+            raise RuntimeError('Cannot get mysql server list')
+
+    def get_mysql_server(self,server):
+        """Get list of mysql servers"""
+        try:
+            retval = self.session.query(self.Database_servers).filter(self.Database_servers.server==server).one()
+            self.session.commit()
+            return retval
+        except NoResultFound:
+            self.session.rollback()
+            raise DoesNotFound('Mysql server %s does not exist' % server)
+        except IntegrityError as e:
+            self.session.rollback()
+            self.log.exception(e)
+            self.log.error('Cannot get mysql server list')
+            raise RuntimeError('Cannot get mysql server list')
+        except OperationalError as e:
+            self.session.rollback()
+            self.reconnect()
+            self.log.exception(e)
+            self.log.error('Cannot get mysql server list')
+            raise RuntimeError('Cannot get mysql server list')
 
     def __del__(self):
         try:
@@ -639,16 +879,21 @@ class Services():
             pass
 
 
-    class Host(object):
-        """Host object
-        object is mapped to the hosts view"""
-
-
     class Domain(object):
         """Domain object
        object is mapped to the domains view"""
         pass
 
+
+    class Users(object):
+        """Users object
+        mapped to users view"""
+        pass
+
+    class Customers(object):
+        """Customers object
+        mapped to customers view"""
+        pass
 
     class Vhost(object):
         """Vhost object
@@ -683,7 +928,23 @@ class Services():
         pass
 
 
-    class User_port(object):
+    class User_port_servers(object):
+        """User_port_servers object
+        object is mapped to the user_port_server view"""
+
+
+    class User_ports(object):
         """User_port object
         object is mapped to the user_ports view"""
+        pass
+
+    class Databases(object):
+        """Databases object
+        mapped to databases view"""
+        pass
+
+
+    class Database_servers(object):
+        """Database_servers object
+        mapped to database_servers view"""
         pass
