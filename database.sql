@@ -1,7 +1,9 @@
 
 CREATE GROUP users;
 CREATE GROUP admins;
+CREATE GROUP servers;
 GRANT CONNECT ON DATABASE services to admins;
+GRANT CONNECT ON DATABASE services to servers;
 
 CREATE SCHEMA services;
 alter database services SET search_path TO public,services;
@@ -36,10 +38,9 @@ GRANT EXECUTE ON FUNCTION public.is_admin() TO users;
 GRANT EXECUTE ON FUNCTION public.is_admin() TO admins;
 
 
-
 -- Function for array comparsions
 
-CREATE OR REPLACE FUNCTION compare_arrays(first text[], second text[])
+CREATE OR REPLACE FUNCTION public.compare_arrays(first text[], second text[])
     RETURNS SETOF text
     AS $$
 DECLARE
@@ -52,16 +53,18 @@ BEGIN
     RETURN;
 END;
 $$ LANGUAGE plpgsql;
+GRANT EXECUTE ON FUNCTION public.compare_arrays(text[], text[]) TO users;
+GRANT EXECUTE ON FUNCTION public.compare_arrays(text[], text[]) TO admins;
 
 CREATE OR REPLACE FUNCTION public.last_elem (text[]) RETURNS text AS $$
  SELECT $1[array_length($1,1)];
 $$ LANGUAGE SQL;
 
 GRANT EXECUTE ON FUNCTION public.last_elem(text[]) TO users;
+GRANT EXECUTE ON FUNCTION public.last_elem(text[]) TO admins;
 
-
+/*
 -- array reverse function ( currently not used )
-
 CREATE OR REPLACE FUNCTION array_reverse(anyarray) RETURNS anyarray AS $$
 SELECT ARRAY(
     SELECT $1[i]
@@ -69,8 +72,9 @@ SELECT ARRAY(
     ORDER BY i DESC
 );
 $$ LANGUAGE 'sql' STRICT IMMUTABLE;
+*/
 
-CREATE OR REPLACE FUNCTION vhostdomaincat(vhost text, domain text) RETURNS text AS $$
+CREATE OR REPLACE FUNCTION public.vhostdomaincat(vhost text, domain text) RETURNS text AS $$
   BEGIN
     IF vhost IS NULL OR vhost = '' THEN
       RETURN domain;
@@ -83,7 +87,11 @@ CREATE OR REPLACE FUNCTION vhostdomaincat(vhost text, domain text) RETURNS text 
   END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION emaildomaincat(name text, domain text) RETURNS text AS $$
+GRANT EXECUTE ON FUNCTION public.vhostdomaincat(text,text) TO admins;
+GRANT EXECUTE ON FUNCTION public.vhostdomaincat(text,text) TO users;
+
+-- Join domain and mailbox name
+CREATE OR REPLACE FUNCTION public.emaildomaincat(name text, domain text) RETURNS text AS $$
   BEGIN
     IF name IS NULL OR name = '' THEN
       RETURN NULL;
@@ -95,6 +103,9 @@ CREATE OR REPLACE FUNCTION emaildomaincat(name text, domain text) RETURNS text A
     END IF;
   END;
 $$ LANGUAGE plpgsql;
+
+GRANT EXECUTE ON FUNCTION public.emaildomaincat(text,text) TO admins;
+GRANT EXECUTE ON FUNCTION public.emaildomaincat(text,text) TO users;
 
 -- epic funtion to find domain for vhost
 
@@ -137,6 +148,7 @@ CREATE OR REPLACE FUNCTION public.find_domain(domain text) RETURNS integer AS $$
 $$ LANGUAGE plpgsql;
 
 GRANT EXECUTE ON FUNCTION public.find_domain(text) TO users;
+GRANT EXECUTE ON FUNCTION public.find_domain(text) TO admins;
 
 
 ------------------
@@ -168,10 +180,11 @@ END;
 $$ LANGUAGE plpgsql;
 
 GRANT EXECUTE ON FUNCTION public.find_vhost(text) TO users;
+GRANT EXECUTE ON FUNCTION public.find_vhost(text) TO admins;
 
 -- Some mail functions --
 
-
+-- Find mailbox name from email address.
 CREATE OR REPLACE FUNCTION public.mail_name(mail text) RETURNS text AS $$
 DECLARE
     domain text;
@@ -192,7 +205,10 @@ END;
 $$ LANGUAGE plpgsql;
 
 GRANT EXECUTE ON FUNCTION public.mail_name(text) TO users;
+GRANT EXECUTE ON FUNCTION public.mail_name(text) TO admins;
 
+
+-- find domain from email address
 CREATE OR REPLACE FUNCTION public.mail_domain(mail text) RETURNS integer AS $$
 DECLARE
     domain text;
@@ -214,15 +230,16 @@ END;
 $$ LANGUAGE plpgsql;
 
 GRANT EXECUTE ON FUNCTION public.mail_domain(text) TO users;
+GRANT EXECUTE ON FUNCTION public.mail_domain(text) TO admins;
 
+/*
 -- multi dimersional array
-
-CREATE OR REPLACE FUNCTION  2(text, text) RETURNS text[]
+CREATE OR REPLACE FUNCTION  array_agg2(text, text) RETURNS text[]
 AS 'select ARRAY[$1::text, $2::text];'
 LANGUAGE SQL
 IMMUTABLE
 RETURNS NULL ON NULL INPUT;
-
+*/
 /*
 DROP AGGREGATE IF EXISTS array_agg2(text,text);
 CREATE AGGREGATE array_agg2(text, text)
@@ -233,6 +250,7 @@ CREATE AGGREGATE array_agg2(text, text)
 );
 */
 
+/*
 CREATE OR REPLACE FUNCTION array_agg_custom_cut(anyarray)
 RETURNS anyarray
     AS 'SELECT $1[2:array_length($1, 1)]'
@@ -246,14 +264,18 @@ CREATE AGGREGATE array_agg_custom(anyarray)
     FINALFUNC = array_agg_custom_cut,
     INITCOND = $${{'', ''}}$$
 );
+*/
 
-
-CREATE AGGREGATE array_accum (anyelement)
+CREATE AGGREGATE public.array_accum (anyelement)
 (
     sfunc = array_append,
     stype = anyarray,
     initcond = '{}'
 );
+
+GRANT EXECUTE ON FUNCTION public.array_accum (anyelement) TO users;
+GRANT EXECUTE ON FUNCTION public.array_accum (anyelement) TO admins;
+
 
 CREATE OR REPLACE FUNCTION unnest_multidim(anyarray)
 RETURNS SETOF anyarray AS
@@ -267,8 +289,11 @@ GROUP BY series2.i
 $BODY$
 LANGUAGE 'sql' IMMUTABLE;
 
+GRANT EXECUTE ON FUNCTION unnest_multidim(anyarray) TO users;
+GRANT EXECUTE ON FUNCTION unnest_multidim(anyarray) TO admins;
 
 
+-- Search first unused port by services_id
 CREATE OR REPLACE FUNCTION public.find_free_port(services_id integer)
 RETURNS integer
 AS $$
@@ -280,8 +305,7 @@ DECLARE
 BEGIN
     FOR host_id IN SELECT t_services.t_services_id FROM services.t_services
                    WHERE services_id = t_services.t_services_id
-                   AND t_services.service_type = 'USER_PORTS'
-                   AND t_services.service_category = 'SHELL'
+                   AND t_services.service_type = 'USER_PORT'
                    LIMIT 1
         LOOP
         FOR port IN SELECT (t_user_ports.port + 1) AS port
@@ -313,9 +337,12 @@ $$ LANGUAGE plpgsql
 SECURITY DEFINER;
 -- If this can be done more securely let me know!
 
+GRANT EXECUTE ON FUNCTION public.find_free_port (integer) TO users;
+GRANT EXECUTE ON FUNCTION public.find_free_port (integer) TO admins;
+
 -- Function to create history tables
 
-CREATE OR REPLACE FUNCTION create_history_table(tablename text)
+CREATE OR REPLACE FUNCTION services.create_history_table(tablename text)
 RETURNS VOID
 AS $$
 DECLARE
@@ -391,8 +418,8 @@ ELSE
 END;
 $$ LANGUAGE plpgsql;
 
-DROP function historize_view(text,text,text);
-CREATE OR REPLACE FUNCTION historize_view(viewname text, tkey text, tvalue text)
+DROP FUNCTION IF EXISTS services.historize_view(text,text,text);
+CREATE OR REPLACE FUNCTION services.historize_view(viewname text, tkey text, tvalue text)
 RETURNS VOID
 AS $$
 DECLARE
@@ -549,18 +576,40 @@ BEGIN
 END;
 $f$ LANGUAGE plpgsql;
 
-DROP FUNCTION public.valid_database_name(text);
-CREATE FUNCTION public.valid_database_name(database text)
+GRANT EXECUTE ON FUNCTION services.ip_on_subnet(inet, integer) TO admins;
+
+DROP FUNCTION IF EXISTS public.valid_database_name(text);
+CREATE OR REPLACE FUNCTION public.valid_database_name(database text)
 RETURNS BOOLEAN
 AS
 $f$
 DECLARE
     regex text;
+    isvalid boolean;
+    alias text;
 BEGIN
     regex := '^' || CURRENT_USER::text || '(_[a-z0-9_]+)?$';
-    RETURN database ~* regex;
+    isvalid := database ~* regex;
+    IF isvalid = TRUE THEN
+        RETURN TRUE;
+    END IF;
+    FOR alias IN SELECT DISTINCT unnest(aliases) as alias 
+                FROM users JOIN customers USING (t_customers_id) 
+                WHERE users.name = CURRENT_USER::text LOOP
+        IF alias IS NOT NULL THEN
+            regex := '^' || CURRENT_USER::text || '(_[a-z0-9_]+)?$';
+            isvalid := database ~* regex;
+            IF isvalid = TRUE THEN
+                RETURN TRUE;
+            END IF;
+        END IF;
+    END LOOP;
+    RETURN FALSE;
 END;
 $f$ LANGUAGE plpgsql;
+
+GRANT EXECUTE ON FUNCTION public.valid_database_name(text) TO users;
+GRANT EXECUTE ON FUNCTION public.valid_database_name(text) TO admins;
 
 --
 -- Functios end
@@ -569,11 +618,11 @@ $f$ LANGUAGE plpgsql;
 -- CREATE TYPES --
 
 CREATE TYPE t_change_log_event_type AS ENUM ('INSERT', 'UPDATE', 'DELETE');
-CREATE type domain_type AS enum ('master', 'slave', 'none');
+CREATE type domain_type AS enum ('MASTER', 'SLAVE', 'NONE');
 CREATE TYPE event_type AS ENUM ('INSERT','UPDATE', 'DELETE');
 CREATE TYPE t_hosts_type AS ENUM ('HARDWARE', 'VIRTUAL');
-CREATE TYPE service_category AS ENUM ('DATABASE', 'MAIL', 'WWW', 'SHELL', 'OTHER');
-CREATE TYPE service_type AS ENUM ('VHOST','MAIL','MAILLIST','JABBER','WORDPRESS','USER_PORTS','SHELL','POSTGRESQL','MYSQL');
+--CREATE TYPE service_category AS ENUM ('DATABASE', 'MAIL', 'WWW', 'SHELL', 'OTHER');
+--CREATE TYPE service_type AS ENUM ('VHOST','MAIL','MAILLIST','JABBER','WORDPRESS','USER_PORTS','SHELL','POSTGRESQL','MYSQL');
 
 ------------------
 -- t_change_log --
@@ -585,11 +634,14 @@ CREATE TABLE services.t_change_log
   table_ref oid NOT NULL,
   event_type t_change_log_event_type NOT NULL,
   data_id integer NOT NULL,
-  transaction_id bigint NOT NULL DEFAULT txid_current()
+  transaction_id bigint NOT NULL DEFAULT txid_current(),
+  username text NOT NULL
 );
 
 COMMENT ON COLUMN t_change_log.event_type IS 'INSERT, UPDATE, DELETE';
 GRANT USAGE ON t_change_log_t_change_log_id_seq to users;
+
+GRANT SELECT ON services.t_change_log TO admins;
 
 CREATE OR REPLACE RULE t_change_log_insert_notify
 AS
@@ -608,10 +660,10 @@ GRANT SELECT ON services.change_log TO servers;
 GRANT SELECT ON services.change_log TO admins;
 
 -- CUSTOMERS
--- You maybe want to user somekind of wrapper for this, but this is default way to do this.
+-- You maybe want to use a somekind of wrapper for this, but this is the default way to do this.
 
-CREATE TABLE t_customers (
-    t_customers_id integer NOT NULL,
+CREATE TABLE services.t_customers (
+    t_customers_id integer NOT NULL PRIMARY KEY,
     name text NOT NULL,
     created timestamp with time zone DEFAULT now() NOT NULL,
     closed timestamp with time zone
@@ -635,48 +687,10 @@ SELECT create_log_triggers('services.t_aliases');
 GRANT SELECT,UPDATE,INSERT,DELETE ON services.t_aliases TO admins;
 GRANT USAGE ON services.t_aliases_t_aliases_id_seq TO admins;
 
-CREATE OR REPLACE VIEW public.customers AS
-SELECT t_customers.t_customers_id, t_customers.name, array_agg(t_aliases.alias) as aliases
-FROM t_customers
-JOIN t_users USING (t_customers_id)
-LEFT JOIN t_aliases USING (t_customers_id)
-WHERE (t_users.name = CURRENT_USER OR public.is_admin())
-GROUP BY t_customers.t_customers_id;
-
-GRANT SELECT ON public.customers TO users;
-GRANT SELECT ON public.customers TO admins;
-
--- USERS
-
-CREATE TABLE t_users (
-    t_users_id integer NOT NULL,
-    t_customers_id integer NOT NULL,
-    created timestamp with time zone DEFAULT now() NOT NULL,
-    name text NOT NULL UNIQUE,
-    lastname text,
-    firstnames text,
-    phone text,
-    unix_uid integer UNIQUE,
-    password_changed timestamp with time zone DEFAULT now() NOT NULL,
-    t_domains_id integer references t_domains NOT NULL
-);
-
-GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_users TO admins;
-
-SELECT create_log_triggers('services.t_users');
-
-CREATE OR REPLACE VIEW public.users AS
-    SELECT t_users.t_customers_id, t_users.name, t_users.lastname, t_users.firstnames, t_users.phone,
-    t_users.unix_id, t_users.t_users_id, t_users.t_domains_id, public.is_admin(t_users.name) as admin
-    FROM services.t_users
-    WHERE (t_users.name = ("current_user"())::text OR public.is_admin());
-
-GRANT SELECT ON public.users TO users;
-GRANT SELECT ON public.users TO admins;
 
 -- DOMAINS
 
-CREATE TABLE t_domains (
+CREATE TABLE services.t_domains (
     t_domains_id serial NOT NULL PRIMARY KEY,
     name text UNIQUE NOT NULL,
     shared boolean DEFAULT false NOT NULL,
@@ -690,7 +704,7 @@ CREATE TABLE t_domains (
     minimum_cache_time integer DEFAULT 21600 NOT NULL,
     ttl integer DEFAULT 10800 NOT NULL,
     admin_address text DEFAULT 'hostmaster@kapsi.fi'::text NOT NULL,
-    domain_type domain_type DEFAULT 'master'::domain_type NOT NULL,
+    domain_type domain_type DEFAULT 'MASTER'::domain_type NOT NULL,
     masters inet[],
     allow_transfer inet[]
 );
@@ -712,7 +726,61 @@ ALTER TABLE t_domains ADD CONSTRAINT "domains_check" CHECK (
 ALTER TABLE t_domains ADD CONSTRAINT "valid_admin_address" CHECK (
     admin_address ~ '^[^@\s]+@[^@\s]+(\.[^@\s]+)+$');
 
+CREATE TABLE services.t_dns_keys (
+    t_dns_keys_id integer PRIMARY KEY NOT NULL,
+    name text NOT NULL,
+    algorithm text NOT NULL,
+    key text NOT NULL,
+    description text
+);
+
+-- Many to many relation
+
+CREATE TABLE services.t_domain_dns_keys (
+    t_domains_id integer NOT NULL,
+    t_dns_keys_id integer NOT NULL
+);
+
 SELECT create_log_triggers('services.t_dns_keys');
+
+-- USERS
+
+CREATE TABLE services.t_users (
+    t_users_id serial NOT NULL PRIMARY KEY,
+    t_customers_id integer NOT NULL,
+    created timestamp with time zone DEFAULT now() NOT NULL,
+    name text NOT NULL UNIQUE,
+    lastname text,
+    firstnames text,
+    phone text,
+    unix_id integer UNIQUE,
+    password_changed timestamp with time zone DEFAULT now() NOT NULL,
+    t_domains_id integer references t_domains NOT NULL
+);
+
+GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_users TO admins;
+
+SELECT create_log_triggers('services.t_users');
+
+CREATE OR REPLACE VIEW public.users AS
+    SELECT t_users.t_customers_id, t_users.name, t_users.lastname, t_users.firstnames, t_users.phone,
+    t_users.unix_id, t_users.t_users_id, t_users.t_domains_id, public.is_admin(t_users.name) as admin
+    FROM services.t_users
+    WHERE (t_users.name = ("current_user"())::text OR public.is_admin());
+
+GRANT SELECT ON public.users TO users;
+GRANT SELECT ON public.users TO admins;
+
+CREATE OR REPLACE VIEW public.customers AS
+SELECT t_customers.t_customers_id, t_customers.name, array_agg(distinct t_aliases.alias) as aliases
+FROM t_customers
+JOIN t_users USING (t_customers_id)
+LEFT JOIN t_aliases USING (t_customers_id)
+WHERE (t_users.name = CURRENT_USER OR public.is_admin())
+GROUP BY t_customers.t_customers_id;
+
+GRANT SELECT ON public.customers TO users;
+GRANT SELECT ON public.customers TO admins;
 
 -- Domains view
 
@@ -813,7 +881,7 @@ GRANT USAGE ON services.t_domains_t_domains_id_seq TO admins;
 
 CREATE TABLE services.t_subnets
 (   t_subnets_id serial NOT NULL PRIMARY KEY,
-    name text NOT NULL,
+    name text NOT NULL UNIQUE,
     location text NOT NULL,
     info text,
     vlan_tag integer NOT NULL DEFAULT 0,
@@ -864,7 +932,7 @@ CREATE TABLE services.t_interfaces
     t_hosts_id integer REFERENCES t_hosts NOT NULL,
     info text,
     active boolean NOT NULL DEFAULT true,
-    mac_address text -- optional
+    mac_address macaddr -- optional
 );
 
 ALTER TABLE services.t_interfaces ADD UNIQUE (t_domains_id, name);
@@ -881,12 +949,18 @@ SELECT create_log_triggers('services.t_interfaces');
 --------------
 -- Contains services on this environment
 
+CREATE TABLE services.t_service_types
+(
+    t_service_type_id serial PRIMARY KEY NOT NULL,
+    service_type text NOT NULL UNIQUE,
+    service_category text NOT NULL
+);
+
 CREATE TABLE services.t_services
 (
     t_services_id serial NOT NULL PRIMARY KEY,
     t_interfaces_id integer references t_interfaces,
-    service_type service_type NOT NULL,
-    service_category service_category NOT NULL,
+    service_type text references t_service_types (service_type) NOT NULL,
     t_domains_id integer references t_domains NOT NULL,
     info text,
     active boolean DEFAULT true NOT NULL,
@@ -900,6 +974,17 @@ GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_services TO admins;
 GRANT SELECT ON services.t_services TO servers;
 
 SELECT create_log_triggers('services.t_services');
+
+-- Populate t_service_types
+insert into t_service_types (service_category, service_type) VALUES ('DATABASE','MYSQL');
+insert into t_service_types (service_category, service_type) VALUES ('DATABASE','POSTGRESQL');
+insert into t_service_types (service_category, service_type) VALUES ('MAIL','MAIL');
+insert into t_service_types (service_category, service_type) VALUES ('MAIL','MAILLIST');
+insert into t_service_types (service_category, service_type) VALUES ('VHOST','VHOST');
+insert into t_service_types (service_category, service_type) VALUES ('VHOST','WORDPRESS');
+insert into t_service_types (service_category, service_type) VALUES ('SHELL','USER_PORT');
+insert into t_service_types (service_category, service_type) VALUES ('SHELL','SHELL');
+insert into t_service_types (service_category, service_type) VALUES ('OTHER','JABBER');
 
 ------------
 -- VHOSTS --
@@ -1177,7 +1262,7 @@ CREATE TABLE services.t_mailboxes
     t_mailboxes_id serial PRIMARY KEY NOT NULL,
     t_domains_id integer references t_domains NOT NULL,
     name text NOT NULL,
-    t_customers_id integer references t_customes NOT NULL,
+    t_customers_id integer references t_customers NOT NULL,
     created timestamptz DEFAULT NOW() NOT NULL
 );
 
@@ -1186,24 +1271,35 @@ ALTER TABLE t_mailboxes ADD CONSTRAINT valid_name CHECK (lower(name) ~* $t$^[a-z
 
 GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_mailboxes TO admins;
 
+CREATE TABLE services.t_mail_aliases (
+    t_mail_aliases_id serial NOT NULL PRIMARY KEY,
+    t_domains_id integer NOT NULL REFERENCES services.t_domains,
+    name text NOT NULL,
+    t_mailboxes_id integer NOT NULL REFERENCES services.t_mailboxes,
+    t_customers_id integer NOT NULL REFERENCES services.t_customers
+);
+
+ALTER TABLE t_mail_aliases ADD CONSTRAINT valid_name CHECK (lower(name) ~* $t$^[a-z0-9\.!#$%&'*+-/=?^_`{|}~]+$$t$);
+
 SELECT create_log_triggers('services.t_mail_aliases');
 SELECT create_log_triggers('services.t_mailboxes');
 
 DROP VIEW public.mailboxes;
 CREATE OR REPLACE VIEW public.mailboxes
 AS
-SELECT t_mailboxes.t_mailboxes_id, t_mailboxes.name || '@' || t_domains_mail.name as name, t_mailboxes.t_customers_id, t_mailboxes.created,
-array_agg(t_mail_aliases.name || '@' || t_domains.name) AS aliases, t_domains_mail.t_domains_id
+SELECT t_mailboxes.t_mailboxes_id, t_mailboxes.name || '@' || t_domain_mail.name as name, t_mailboxes.t_customers_id, t_mailboxes.created,
+array_agg(t_mail_aliases.name || '@' || t_domains.name) AS aliases, t_domain_mail.t_domains_id
   FROM t_mailboxes
   JOIN t_customers USING (t_customers_id)
   JOIN t_users USING (t_customers_id)
-  JOIN t_domains as t_domains_mail USING (t_domains_id)
+  JOIN t_domains as t_domain_mail ON t_mailboxes.t_domains_id = t_domain_mail.t_domains_id
   LEFT JOIN t_mail_aliases USING (t_mailboxes_id)
   LEFT JOIN t_domains ON t_mail_aliases.t_domains_id = t_domains.t_domains_id
  WHERE (t_users.name = CURRENT_USER OR public.is_admin())
- GROUP BY t_mailboxes.t_mailboxes_id, t_domains_mail.t_domains_id, t_domains_mail.t_domains_id;
+ GROUP BY t_mailboxes.t_mailboxes_id, t_domain_mail.t_domains_id, t_domain_mail.t_domains_id;
 
 GRANT SELECT ON mailboxes TO users;
+GRANT SELECT ON mailboxes TO admins;
 
 CREATE OR REPLACE VIEW public.mail_aliases AS
 SELECT t_mail_aliases.t_customers_id, t_mail_aliases_id,
@@ -1215,7 +1311,7 @@ JOIN t_users ON t_mail_aliases.t_customers_id =  t_users.t_customers_id
 WHERE (t_users.name = CURRENT_USER OR public.is_admin());
 
 GRANT SELECT ON public.mail_aliases TO users;
-
+GRANT SELECT ON public.mail_aliases TO admins;
 
 CREATE OR REPLACE RULE mailboxes_insert
 AS ON INSERT TO public.mailboxes
@@ -1248,9 +1344,11 @@ WHERE ((users.name = CURRENT_USER  AND NOT public.is_admin()) OR (public.is_admi
 );
 
 GRANT INSERT on mailboxes TO users;
+GRANT INSERT on mailboxes TO admins;
 GRANT USAGE ON t_mailboxes_t_mailboxes_id_seq to users;
 GRANT USAGE ON t_mail_aliases_t_mail_aliases_id_seq TO users;
-
+GRANT USAGE ON t_mailboxes_t_mailboxes_id_seq to admins;
+GRANT USAGE ON t_mail_aliases_t_mail_aliases_id_seq TO admins;
 
 CREATE OR REPLACE RULE mailboxes_update
 AS ON UPDATE TO public.mailboxes
@@ -1284,6 +1382,7 @@ WHERE ((users.name = CURRENT_USER  AND NOT public.is_admin()) OR (public.is_admi
 );
 
 GRANT UPDATE on mailboxes TO users;
+GRANT UPDATE on mailboxes TO admins;
 
 CREATE OR REPLACE RULE mailboxes_delete
 AS ON DELETE TO mailboxes
@@ -1305,12 +1404,15 @@ AND ( t_users.name = "current_user"()::text OR public.is_admin())
 ;
 );
 
+GRANT DELETE on mailboxes TO users;
+GRANT DELETE on mailboxes TO admins;
 
 ------------------
 -- IP-addresses --
 ------------------
 /*
-WTF??
+-- WTF??
+-- Same as t_interfaces maybe
 CREATE TABLE services.t_ip_addresses
 (
     t_ip_addresses_id serial NOT NULL PRIMARY KEY,
@@ -1350,7 +1452,7 @@ CREATE TABLE services.t_user_ports
 ALTER TABLE t_user_ports ADD CONSTRAINT valid_port CHECK ((port > 1024 AND port <= 30000 ) OR ( port >= 40000 AND port < 65536));
 ALTER TABLE t_user_ports ADD UNIQUE (port, t_services_id);
 
-SELECT services.create_log_triggers('t_user_ports');
+SELECT services.create_log_triggers('services.t_user_ports');
 
 CREATE OR REPLACE VIEW public.user_port_servers
 AS
@@ -1363,8 +1465,7 @@ JOIN t_interfaces USING (t_interfaces_id)
 JOIN t_domains ON (t_interfaces.t_domains_id = t_domains.t_domains_id)
 JOIN users ON users.name = CURRENT_USER
 JOIN t_customers ON (t_customers.t_customers_id = users.t_customers_id)
-WHERE t_services.service_type = 'USER_PORTS'
-AND t_services.service_category = 'SHELL'
+WHERE t_services.service_type = 'USER_PORT'
 AND t_services.public = TRUE
 AND t_services.active = TRUE
 AND ( t_services.t_domains_id = users.t_domains_id OR public.is_admin());
@@ -1500,7 +1601,7 @@ GRANT SELECT,UPDATE,DELETE,INSERT ON services.t_databases TO admins;
 GRANT SELECT ON services.t_databases TO users;
 
 -- create log rules
-SELECT services.create_log_triggers('t_databases');
+SELECT services.create_log_triggers('services.t_databases');
 
 -- Database servers view
 
@@ -1514,7 +1615,8 @@ JOIN t_interfaces USING (t_interfaces_id)
 JOIN t_hosts USING (t_hosts_id)
 JOIN t_domains ON t_interfaces.t_domains_id = t_domains.t_domains_id
 JOIN t_users ON CURRENT_USER = t_users.name
-WHERE service_category = 'DATABASE'
+JOIN t_service_types USING (service_type)
+WHERE t_service_types.service_category = 'DATABASE'
 AND t_services.public = True
 AND (t_users.t_domains_id = t_services.t_domains_id OR public.is_admin() = True);
 
@@ -1755,12 +1857,14 @@ ON t_users
 FOR EACH ROW
 EXECUTE PROCEDURE t_users_backup_s_vhosts_trigger();
 
+/*
+-- useless
 DROP TRIGGER IF EXISTS t_users_delete_backup_s_vhosts ON t_users;
 CREATE TRIGGER t_users_delete_backup_s_vhosts
 AFTER INSERT
 ON t_users
 FOR EACH ROW
-EXECUTE PROCEDURE t_users_backup_s_vhosts_trigger();
+EXECUTE PROCEDURE t_users_backup_s_vhosts_trigger();*/
 
 --- domains ---
 
@@ -1802,13 +1906,13 @@ EXECUTE PROCEDURE t_domains_backup_s_vhosts_trigger();
 -- t_domains history --
 -----------------------
 
-select create_history_table('t_domains');
+SELECT create_history_table('t_domains');
 ALTER TABLE t_domains_history SET SCHEMA services;
 GRANT select ON t_domains_history TO servers;
 GRANT select ON t_domains_history TO admins;
 
 
-DROP FUNCTION t_domains_historize_trigger();
+DROP FUNCTION IF EXISTS t_domains_historize_trigger();
 CREATE OR REPLACE FUNCTION t_domains_historize_trigger()
 RETURNS TRIGGER
 AS $trigger$
@@ -1826,7 +1930,7 @@ $trigger$ LANGUAGE plpgsql
 -- run as creator
 SECURITY DEFINER;
 
-DROP TRIGGER t_domains_update FROM t_domains
+DROP TRIGGER IF EXISTS t_domains_update ON t_domains;
 CREATE TRIGGER t_domains_update
 BEFORE UPDATE
 ON t_domains
@@ -1834,7 +1938,7 @@ FOR EACH ROW
 WHEN (OLD.* IS DISTINCT FROM NEW.*)
 EXECUTE PROCEDURE t_domains_historize_trigger();
 
-DROP TRIGGER t_domains_delete FROM t_domains
+DROP TRIGGER IF EXISTS t_domains_delete ON t_domains;
 CREATE TRIGGER t_domains_delete
 BEFORE DELETE
 ON t_domains

@@ -10,6 +10,9 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 
 class User_ports(object):
+    """Services user_ports service
+    Initialize with Services object"""
+
     def __init__(self,main):
         self.main = main
         self.log = logging.getLogger('services.user_ports')
@@ -25,6 +28,9 @@ class User_ports(object):
         return retval
 
     def get(self, server, port):
+        """Get user port on <server>
+        Raises DoesNotExist if not found
+        Returns port object on successful """
         try:
             port = int(port)
         except ValueError:
@@ -101,7 +107,7 @@ class User_ports(object):
             raise RuntimeError('Cannot get server %s' % server)
             
     def list_servers(self):
-        """Get shell servers 
+        """Get shell servers list
         Raises RuntimeError on database error
         Returns list of user_port_server objects on success"""
         try:

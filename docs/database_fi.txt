@@ -1,55 +1,107 @@
 Dokumentaatio tietokannoista
 
-TODO
+==========
+= Taulut =
+==========
 
-t_customers
-* Jokaista asiakasta varten tähän tauluun lisätään rivi
-* Sisältää tietoja asiakkaasta
+=== t_customers ===
+* Taulu sisältää tiedon asiakkaista/jäsenistä
+** rivi per asiakas
+* Asiakkailla on nimi (yrityksen tai henkilö nimi)
+* Asiakkaaseen kuuluu yksi tai useampi käyttäjä
 
-t_users
+=== t_aliases ===
+* Taulu sisältää tiedon asiakkaiden globaalin nimiavaruuden aliaksista
+* Aliaksia käytetään, kun asiakas tarvitsee globaalin nimiavaruuden palveluita (mysql,shell yms)
+  muulla, kuin omalla käyttäjänimellään varustettuna.
+
+=== t_users ===
 * Jokaisella asiakkaalla voi olla useampi käyttäjä
-* Käyttäjä voi olla esim. mailbox käyttäjä
+* Käyttäjä voi olla virtuaalinen käyttäjä tai liitetty johonkin 
+  unix tunnukseen unix_id:n avulla.
+* Domain kertoo, mihin domainiin käyttäjä liittyy
+** Domain määrittelee, mitä palveluita käyttäjälle voi asettaa.
 
+=== t_domains ===
+* Taulu sisältää tiedon käyttäjien domainista.
 
-t_vhosts
+== Kentät ==
+* name (text) Domainin nimi, kuten kapsi.fi
+* shared (bool) Kertoo onko domain jaettu, kertoo voiko domainia käyttää 
+  muutkin asiakkaat, kuin domainin omistaja
+* t_customers_id (integer) viittaus t_customers taulussa olevaan domainin omistajaan
+* dns (bool) kertoo liittyykö domainiin dns-tietueita
+* created (timestamptz) milloin domain on lisätty
+* updated (timestamptz) milloin domainia on päivitetty
+* refresh_time (integer) SOA tietue
+* retry_time (integer) SOA tietue
+* expire_time (integer) SOA tietue
+* minimum_cache_time (integer) SOA tietue
+* ttl (integer) SOA tietue
+* admin_address (text) hostmasterin sähköpostiosoite
+* domain_type (MASTER|SLAVE|NONE), onko tämä nimipalvelin ensi- vai toissijainen
+* masters inet[] lista domainin master-palvelimista
+* allow_transfer inet[] mitkä palvelimet saavat hakea domainin tältä palvelimelta.
+
+=== t_vhosts ===
 * taulu, johon aliakset referoi
 * sisältää tiedot vhostin omistajasta
 * referoi domainiin
 
-vhosts
+
+=== t_hosts ===
+* Sisältää tiedon palvelimista
+
+== Kentät ==
+* name (text) palvelimen nimi
+* type (HARDWARE|VIRTUAL) onko palvelin virtuaalinen vai fyysinen rauta
+* t_domains_id (integer) viittaus t_domains taulussa olevaan domainiin, johon tämä palvelin kuuluu
+* t_customers_id (integer) viittaus t_customers tauluun, jossa tämän palvelimen omistaja on
+
+=== t_subnets ===
+* name (text) verkon nimi
+* location (text) Verkon fyysinen sijainti
+* info (text) lisätietoa verkosta
+* vlan_tag (integer) tägätyn vlanin numero, fyysisellä verkolla nolla
+* address (inet) osoiteavaruus esim. 10.0.1.0/24
+* gateway (inet) verkon oletusgateway
+* dns_servers (inet[]) mitä nimipalvelimia tässä verkossa tulee käyttää
+* dhcp_range (inet) Mitkä osoitteet on varattu dhcp:lle
+* dhcp_options (text) mahdolliset optiot dhcp:lle
+* mtu (integer) verkon mtu, oletuksena 1500
+* hostmaster_address (text) verkon vastaavan sähköpostiosoite (dns tietuetta varten)
+
+
+==========
+= Viewit =
+==========
+
+=== vhosts ===
 * viewi mitä käyttäjät voi käyttää
 * näyttää käyttäjille vain omat palvelut
 * admineille näytetään kaikkien palvelut
 * insertoidessa customer_id on defaulttina käyttäjän customer_id
 ** vain admin voi käyttää jotain muuta customer_id:tä
 
-t_user_ports
+=== t_user_ports ===
 * Taulu, joka sisältää tiedon käyttäjien avoimista porteista shell-palvelimilla
 * portit väliltä 40000 - 65536
 
-user_ports
+=== t_change_log ===
+* Taulu, joka sisältää tiedot tietokantaan tehdyistä muutoksista
+
+=== user_ports ===
 * Viewi, missä käyttäjä näkee omat porttinsa.
 * Adminille näkyy kaikkien käyttäjien portit.
 * customers_id oletuksena käyttäjän oma
 * Portti arvotaan public.find_free_port(services_id) funktiolla seuraavaksi vapaaksi portiksi
 
-
-t_change_log 
-* Taulu, joka sisältää tiedot tietokantaan tehdyistä muutoksista
-
-services.change_log
-* View, joka on vähän laajennettu näkymä t_change_log:sta
-
-t_customers
-* Taulu sisältää tiedon asiakkaista/jäsenistä
-* Asiakkailla on nimi (yrityksen tai henkilö nimi)
-* Asiakkaaseen kuuluu yksi tai useampi käyttäjä
-
-customers
+=== customers ===
 * View sisältää tiedon asiakkaasta ja tämän aliaksista
+* ks. t_customers
 
-t_aliases
-* Taulu sisältää tiedon asiakkaiden globaalin nimiavaruuden aliaksista
-* Aliaksia käytetään, kun asiakas tarvitsee globaalin nimiavaruuden palveluita (mysql,shell yms)
-  muulla, kuin omalla käyttäjänimellään varustettuna.
+
+
+=== services.change_log
+* View, joka on vähän laajennettu näkymä t_change_log:sta
 
