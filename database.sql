@@ -793,7 +793,7 @@ t_domains.domain_type, t_domains.masters, t_domains.allow_transfer
 FROM t_domains
 JOIN t_customers USING (t_customers_id)
 JOIN t_users USING (t_customers_id)
-WHERE ( t_users.name = "current_user"()::text OR public.is_admin());
+WHERE (( t_users.name = "current_user"()::text AND public.is_admin() IS NULL) OR public.is_admin());
 
 CREATE OR REPLACE RULE domains_insert
 AS ON INSERT TO public.domains
@@ -909,7 +909,8 @@ CREATE TABLE services.t_hosts
     name text NOT NULL UNIQUE,
     type t_hosts_type NOT NULL DEFAULT 'VIRTUAL',
     t_domains_id integer references t_domains,
-    t_customers_id integer references t_customers
+    t_customers_id integer references t_customers,
+    location text NOT NULL DEFAULT ''
 );
 
 ALTER TABLE services.t_hosts ADD CONSTRAINT valid_name CHECK (name ~* '^[a-z0-9]+$');
@@ -936,7 +937,7 @@ CREATE TABLE services.t_interfaces
 );
 
 ALTER TABLE services.t_interfaces ADD UNIQUE (t_domains_id, name);
-ALTER TABLE services.t_interfaces ADD CONSTRAINT valid_name CHECK (name ~* '^[a-z0-9\-\._]+$');
+ALTER TABLE services.t_interfaces ADD CONSTRAINT valid_name CHECK (name ~* '^[a-z0-9\-\._]*$');
 ALTER TABLE services.t_interfaces ADD CONSTRAINT valid_ip CHECK (services.ip_on_subnet(ip_address::inet, t_subnets_id::integer));
 GRANT USAGE ON services.t_interfaces_t_interfaces_id_seq TO admins;
 GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_interfaces TO admins;

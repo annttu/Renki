@@ -15,6 +15,7 @@ from domain import Domains
 from vhost import Vhosts
 from mailbox import Mailboxes
 from user_port import User_ports
+from host import Hosts
 
 logging.basicConfig()
 logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
@@ -56,6 +57,7 @@ class Services():
         self.vhosts = Vhosts(self)
         self.mailboxes = Mailboxes(self)
         self.user_ports = User_ports(self)
+        self.hosts = Hosts(self)
 
     def connect(self, database=None,user=None,password=None,server=None, port=None):
         self.db = create_engine('postgresql://%s:%s@%s/%s' % (self.db_username, self.db_password, self.server, self.database),

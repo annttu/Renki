@@ -3,6 +3,12 @@
 
 """
 mail.py
+
+This file is part of Services Python library and Renki project.
+
+Licensed under MIT-license
+
+Kapsi Internet-käyttäjät ry 2012
 """
 
 from exceptions import *
