@@ -703,7 +703,7 @@ CREATE TABLE services.t_domains (
     expire_time integer DEFAULT 1209600 NOT NULL,
     minimum_cache_time integer DEFAULT 21600 NOT NULL,
     ttl integer DEFAULT 10800 NOT NULL,
-    admin_address text DEFAULT 'hostmaster@kapsi.fi'::text NOT NULL,
+    admin_address text DEFAULT 'hostmaster@example.com'::text NOT NULL,
     domain_type domain_type DEFAULT 'MASTER'::domain_type NOT NULL,
     masters inet[],
     allow_transfer inet[]
@@ -870,7 +870,7 @@ ALTER TABLE public.domains ALTER minimum_cache_time SET DEFAULT 21600;
 ALTER TABLE public.domains ALTER expire_time SET DEFAULT 1209600;
 ALTER TABLE public.domains ALTER ttl SET DEFAULT 10800;
 ALTER TABLE public.domains ALTER domain_type SET DEFAULT 'master';
-ALTER TABLE public.domains ALTER admin_address SET DEFAULT 'hostmaster@kapsi.fi';
+ALTER TABLE public.domains ALTER admin_address SET DEFAULT 'hostmaster@example.com';
 
 GRANT SELECT,INSERT,UPDATE,DELETE ON domains TO users;
 GRANT SELECT,INSERT,UPDATE,DELETE ON domains TO admins;
@@ -893,7 +893,7 @@ CREATE TABLE services.t_subnets
     dhcp_range inet,
     dhcp_options text,
     mtu integer NOT NULL default 1500,
-    hostmaster_address text NOT NULL DEFAULT 'hostmaster@kapsi.fi'::text
+    hostmaster_address text NOT NULL DEFAULT 'hostmaster@example.com'::text
 );
 
 ALTER TABLE services.t_subnets ADD CONSTRAINT "vlan_tag_check" CHECK (vlan_tag >= 0 AND vlan_tag <= 65536);
