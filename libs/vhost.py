@@ -4,10 +4,12 @@
 vhost.py
 """
 
-from exceptions import *
+from services.exceptions import *
 import logging
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
+from sqlalchemy import MetaData, Table, Column, Integer, ForeignKey
+from sqlalchemy.orm import mapper, relationship
 
 # TODO
 # - add_alias()
@@ -19,6 +21,41 @@ class Vhosts(object):
     def __init__(self,main):
         self.main = main
         self.log = logging.getLogger('services.vhosts')
+        self.database_loaded = False
+        if not self.main.dynamic_load:
+            self._load_database()
+
+    def _load_database(self):
+        """Dynamically load database when needed"""
+        if self.database_loaded:
+            return True
+        vhosts = Table('vhosts', self.main.metadata,
+                Column("t_vhosts_id", Integer, primary_key=True),
+                Column("t_customers_id", Integer, ForeignKey('customers.t_customers_id')),
+                Column("t_domains_id", Integer, ForeignKey('domains.t_domains_id')),
+                Column("t_users_id", Integer, ForeignKey('users.t_users_id')),
+                autoload=True)
+        mapper(self.main.Vhosts, vhosts, properties={
+            'customer': relationship(self.main.Customers, backref='vhosts'),
+            'domain': relationship(self.main.Domains, backref='vhosts'),
+            'user': relationship(self.main.Users, backref='vhosts')
+            })
+        vhost_aliases = Table('vhost_aliases', self.main.metadata,
+            Column("t_vhosts_id", Integer, primary_key=True),
+            Column("parent_id", Integer, ForeignKey('vhosts.t_vhosts_id')),
+            autoload=True)
+        mapper(self.main.Vhost_aliases, vhost_aliases, properties={
+            'vhost': relationship(self.main.Vhosts, backref='vhost_aliases')
+        })
+        vhost_redirects = Table('vhost_redirects', self.main.metadata,
+            Column("t_vhosts_id", Integer, primary_key=True),
+            Column("parent_id", Integer, ForeignKey('vhosts.t_vhosts_id')),
+            autoload=True)
+        mapper(self.main.Vhost_redirects, vhost_redirects, properties={
+            'vhost': relationship(self.main.Vhosts, backref='vhost_redirects')
+        })
+        self.database_loaded = True
+        return True
 
     def add(self,name,redirects=[], aliases=[], redirect_to=None):
         """Function to create vhost object
@@ -29,6 +66,7 @@ class Vhosts(object):
         Raises RuntimeError on error
         Returns vhost id
         """
+        self._load_database()
         if not name:
             raise RuntimeError('Vhost name is mandatory argument!')
         else:
@@ -72,6 +110,7 @@ class Vhosts(object):
         addr = address to this domain.
         reverse = if name not specifield use domain as primary address and www.domain as redirect
         """
+        self._load_database()
         if addr.startswith('www.') and not reverse:
             self.add(addr, redirects=[addr[4:]])
         elif reverse:
@@ -84,6 +123,7 @@ class Vhosts(object):
     def delete(self,addr):
         """Delete vhost
         addr = vhost address to delete"""
+        self._load_database()
         if addr is not None:
             try:
                 vhost = self.get(addr)
@@ -97,6 +137,7 @@ class Vhosts(object):
         addr = address
         all = don't limit results to current user vhosts
         """
+        self._load_database()
         try:
             vhost = self.main.session.query(self.main.Vhosts).filter(self.main.Vhosts.name == addr)
             if self.main.customer_id and not getall:
@@ -139,6 +180,7 @@ class Vhosts(object):
             """Get all user vhost objects
             domain = (optional) limit search to this domain
             """
+            self._load_database()
             vhosts = self.main.session.query(self.main.Vhosts)
             if self.main.customer_id:
                 vhosts = vhosts.filter(self.main.Vhosts.t_customers_id == self.main.customer_id)
@@ -154,6 +196,7 @@ class Vhosts(object):
 
     def add_logaccess(self, addr):
         """Enable vhost logaccess"""
+        self._load_database()
         try:
             vhost = self.get(addr)
         except DoesNotExist as e:
@@ -164,6 +207,7 @@ class Vhosts(object):
 
     def del_logaccess(self, addr):
         """Disable vhost logaccess"""
+        self._load_database()
         try:
             vhost = self.get(addr)
         except DoesNotExist as e:

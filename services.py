@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from sqlalchemy import *
+from sqlalchemy.dialects.postgresql import *
 from sqlalchemy import event
 from sqlalchemy.pool import Pool
 from sqlalchemy.orm import mapper, sessionmaker, relationship
@@ -8,19 +9,21 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 import logging
+from services import defaults
 
-
-from database import MySQL, PostgreSQL
-from domain import Domains
-from vhost import Vhosts
-from mailbox import Mailboxes
-from user_port import User_ports
-from host import Hosts
+from services.libs.database import MySQL, PostgreSQL
+from services.libs.domain import Domains
+from services.libs.vhost import Vhosts
+from services.libs.mail import Mailboxes
+from services.libs.user_port import User_ports
+from services.libs.host import Hosts
+from services.libs.subnet import Subnets
+from services.exceptions import DatabaseError, DoesNotExist, PermissionDenied
 
 logging.basicConfig()
 logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
-from exceptions import DatabaseError, DoesNotExist, PermissionDenied
+
 
 def on_connect_listener(target, context):
     log = logging.getLogger('services')
@@ -31,13 +34,16 @@ def on_first_connect_listener(target, context):
     log.info("Connecting to database...")
 
 class Services():
-    def __init__(self, username, password, server, verbose=False, database='services'):
+    def __init__(self, username, password, server, verbose=False, database='services', dynamic_load=True):
         self.db = None
+        self.dynamic_load = dynamic_load
         self.database = database
         self.db_username = username
         self.db_password = password
         self.server=server
         self.verbose = verbose
+        self.defaults = defaults
+        self.metadata = None
         if self.verbose:
             logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
         else:
@@ -53,11 +59,15 @@ class Services():
             raise RuntimeError('Invalid login')
         self.db_password = None
         self.mysql = MySQL(self)
+        self.postgresql = PostgreSQL(self)
         self.domains = Domains(self)
         self.vhosts = Vhosts(self)
         self.mailboxes = Mailboxes(self)
         self.user_ports = User_ports(self)
-        self.hosts = Hosts(self)
+        if self.admin_user:
+            self.hosts = Hosts(self)
+            self.subnets = Subnets(self)
+
 
     def connect(self, database=None,user=None,password=None,server=None, port=None):
         self.db = create_engine('postgresql://%s:%s@%s/%s' % (self.db_username, self.db_password, self.server, self.database),
@@ -67,91 +77,50 @@ class Services():
         """Function to get session"""
         try:
             metadata = MetaData(self.db)
+            self.metadata = metadata
             ## map tables to
             event.listen(Pool, 'first_connect', on_first_connect_listener)
-            domains = Table('domains', metadata,
-                Column("t_domains_id", Integer, primary_key=True), autoload=True)
-            mapper(self.Domains, domains)
             customers = Table('customers', metadata,
-                Column("t_customers_id", Integer, primary_key=True), autoload=True)
+                Column("t_customers_id", Integer, primary_key=True),
+                Column('name', String, nullable=False),
+                Column('masters', ARRAY(TEXT())))
+                #,
+                #autoload=True)
             mapper(self.Customers, customers)
+            domains = Table('domains', self.metadata,
+                Column("t_domains_id", Integer, primary_key=True),
+                Column("name", String,nullable=False),
+                Column('shared', Boolean, nullable=False, default='false'),
+                Column("t_customers_id", Integer, ForeignKey('customers.t_customers_id'), nullable=False),
+                Column('dns', Boolean, nullable=False),
+                Column('refresh_time', Integer, nullable=False, default=text('28800')),
+                Column('retry_time', Integer, nullable=False, default=text('7200')),
+                Column('expire_time', Integer, nullable=False, default=text('1209600')),
+                Column('minimum_cache_time', Integer, nullable=False, default=text('21600')),
+                Column('ttl', Integer, nullable=False, default=text('10800')),
+                Column('admin_address', String, nullable=True),
+                Column('domain_type', Enum('MASTER', 'SLAVE', 'NONE'), primary_key=False, nullable=False, default=text("'MASTER'::domain_type")),
+                Column('masters', ARRAY(INET()), primary_key=False),
+                Column('allow_transfer', ARRAY(INET()), primary_key=False))
+                #autoload=True)
+            mapper(self.Domains, domains, properties={
+                'customer': relationship(self.Customers, backref='domains'),
+            })
             users = Table('users', metadata,
                 Column("t_users_id", Integer, primary_key=True),
                 Column("t_customers_id", Integer, ForeignKey('customers.t_customers_id')),
                 Column("t_domains_id", Integer, ForeignKey('domains.t_domains_id')),
-                autoload=True)
+                Column('name', String, nullable=False),
+                Column('lastname', String, nullable=False),
+                Column('firstnames', String, nullable=False),
+                Column('phone', String, nullable=False),
+                Column('unix_id', Integer, nullable=True),
+                Column('admin', Boolean, nullable=True))
+                #,autoload=True)
             mapper(self.Users, users, properties={
                 'customer': relationship(self.Customers, backref='users'),
                 'domain': relationship(self.Domains, backref='users')
                 })
-            vhosts = Table('vhosts', metadata,
-                Column("t_vhosts_id", Integer, primary_key=True),
-                Column("t_customers_id", Integer, ForeignKey('customers.t_customers_id')),
-                Column("t_domains_id", Integer, ForeignKey('domains.t_domains_id')),
-                Column("t_users_id", Integer, ForeignKey('users.t_users_id')),
-                autoload=True)
-            mapper(self.Vhosts, vhosts, properties={
-                'customer': relationship(self.Customers, backref='vhosts'),
-                'domain': relationship(self.Domains, backref='vhosts'),
-                'user': relationship(self.Users, backref='vhosts')
-                })
-            vhost_aliases = Table('vhost_aliases', metadata,
-                Column("t_vhosts_id", Integer, primary_key=True),
-                Column("parent_id", Integer, ForeignKey('vhosts.t_vhosts_id')),
-                autoload=True)
-            mapper(self.Vhost_aliases, vhost_aliases, properties={
-                'vhost': relationship(self.Vhosts, backref='vhost_aliases')
-            })
-            vhost_redirects = Table('vhost_redirects', metadata,
-                Column("t_vhosts_id", Integer, primary_key=True),
-                Column("parent_id", Integer, ForeignKey('vhosts.t_vhosts_id')),
-                autoload=True)
-            mapper(self.Vhost_redirects, vhost_redirects, properties={
-                'vhost': relationship(self.Vhosts, backref='vhost_redirects')
-            })
-            mailbox = Table('mailboxes', metadata,
-                Column("t_mailboxes_id", Integer, primary_key=True),
-                Column("t_domains_id", Integer, ForeignKey('domains.t_domains_id')),
-                Column("t_customers_id", Integer, ForeignKey('customers.t_customers_id')),
-                autoload=True)
-            mapper(self.Mailboxes, mailbox, properties={
-                'customer': relationship(self.Customers, backref='mailboxes'),
-                'domain': relationship(self.Domains, backref='mailboxes')
-            })
-            mail_aliases = Table('mail_aliases', metadata,
-                Column('t_mail_aliases_id', Integer, primary_key=True),
-                Column("t_domains_id", Integer, ForeignKey('domains.t_domains_id')),
-                Column("t_customers_id", Integer, ForeignKey('customers.t_customers_id')),
-                Column("t_mailboxes_id", Integer, ForeignKey('mailboxes.t_mailboxes_id')),
-                autoload=True)
-            mapper(self.Mail_aliases, mail_aliases, properties={
-                'customer': relationship(self.Customers, backref='mail_aliases'),
-                'domain': relationship(self.Domains, backref='mail_aliases'),
-                'mailbox': relationship(self.Mailboxes, backref='mail_aliases')
-            })
-            user_ports = Table('user_ports', metadata,
-                Column('t_user_ports_id', Integer, primary_key=True),
-                Column('active', Boolean, default=True),
-                Column("t_customers_id", Integer, ForeignKey('customers.t_customers_id')),
-                Column("t_users_id", Integer, ForeignKey('users.t_users_id')),
-                autoload=True)
-            mapper(self.User_ports, user_ports, properties={
-                'customer': relationship(self.Customers, backref='user_ports'),
-                'user': relationship(self.Users, backref='user_ports'),
-            })
-            user_port_servers = Table('user_port_servers', metadata,
-                Column("t_services_id", Integer, primary_key=True), autoload=True)
-            mapper(self.User_port_servers, user_port_servers)
-            databases = Table('databases', metadata,
-                Column("t_databases_id", Integer, primary_key=True),
-                Column("t_customers_id", Integer, ForeignKey('customers.t_customers_id')),
-                autoload=True)
-            mapper(self.Databases, databases, properties={
-                'customer': relationship(self.Customers, backref='databases')
-            })
-            database_servers = Table('database_servers', metadata,
-                Column("t_services_id", Integer, primary_key=True), autoload=True)
-            mapper(self.Database_servers, database_servers)
             Session = sessionmaker(bind=self.db)
             self.session = Session()
             self.admin_user = self.is_admin(self.username)
@@ -237,6 +206,7 @@ class Services():
 
     def list_aliases(self,user=None):
         """List <username> aliases"""
+        alias_list = []
         query = self.session.query(self.Customers.aliases,self.Users.name).join(self.Users, self.Customers.t_customers_id == self.Users.t_customers_id)
         if user is not None:
             query = query.filter(self.Users.name == user)
@@ -245,12 +215,15 @@ class Services():
         else:
             raise RuntimeError('Give either user or customer_id')
         try:
-            retval = query.one()
-            user = retval.name
-            retval = [alias for alias in retval.aliases if alias is not None]
-            retval += [user]
+            retvals = query.all()
+            if len(retvals) < 1:
+                raise RuntimeError('Cannot get alias list')
+            for retval in retvals:
+                user = retval.name
+                alias_list += [alias for alias in retval.aliases if alias is not None]
+                alias_list += [user]
             self.session.commit()
-            return retval
+            return alias_list
         except NoResultFound:
             if user is not None:
                 return DoesNotExist('User %s does not exist' % user)
@@ -293,51 +266,42 @@ class Services():
     class Domains(object):
         """Domain object
         object is mapped to the domains view"""
-        pass
 
 
     class Users(object):
         """Users object
         mapped to users view
         self.customer contains Customers object"""
-        pass
+
 
     class Customers(object):
         """Customers object
         mapped to customers view"""
-        pass
+
 
     class Vhosts(object):
         """Vhost object
         object mapped to vhosts view"""
-        pass
-
-        def __unicode__(self):
-            return self.name
 
 
     class Vhost_aliases(object):
         """Vhost alias object
         object is mapped to the vhost_aliases view"""
-        pass
 
 
     class Vhost_redirects(object):
         """Vhost redirect object
         object is mapped to the vhost_redirects view"""
-        pass
 
 
     class Mailboxes(object):
         """Mailboxes object
         object is mapped to the mailboxes view"""
-        pass
 
 
     class Mail_aliases(object):
         """Mail_aliases object
         object is mapped to the mail_aliases view"""
-        pass
 
 
     class User_port_servers(object):
@@ -353,10 +317,21 @@ class Services():
     class Databases(object):
         """Databases object
         mapped to databases view"""
-        pass
 
 
     class Database_servers(object):
         """Database_servers object
         mapped to database_servers view"""
-        pass
+
+
+    class Subnets(object):
+        """Subnets object
+        mapped to t_subnets table"""
+
+
+    class Addresses(object):
+        """Mapped to t_addresses table"""
+
+
+    class Hosts(object):
+        """Mapped to t_hosts table"""

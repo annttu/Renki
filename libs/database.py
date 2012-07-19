@@ -11,21 +11,51 @@ Licensed under MIT-license
 Kapsi Internet-käyttäjät ry 2012
 """
 
-from exceptions import *
+from services.exceptions import *
 import logging
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
+from sqlalchemy import MetaData, Table, Column, Integer, ForeignKey
+from sqlalchemy.orm import mapper, relationship
 
 class Database(object):
     def __init__(self,main):
         self.main = main
         self.log = logging.getLogger('services.databases')
         self.type = ''
+        self.database_loaded = False
+        if not self.main.dynamic_load:
+            self._load_database()
+
+    def _load_database(self):
+        """Load database when needed"""
+        if self.database_loaded:
+            return True
+        try:
+            # test if already loaded
+            self.main.Database._sa_class_manager
+            self.database_loaded = True
+            return
+        except:
+            pass
+        databases = Table('databases', self.main.metadata,
+            Column("t_databases_id", Integer, primary_key=True),
+            Column("t_customers_id", Integer, ForeignKey('customers.t_customers_id')),
+            autoload=True)
+        mapper(self.main.Databases, databases, properties={
+            'customer': relationship(self.main.Customers, backref='databases')
+        })
+        database_servers = Table('database_servers', self.main.metadata,
+            Column("t_services_id", Integer, primary_key=True), autoload=True)
+        mapper(self.main.Database_servers, database_servers)
+        self.database_loaded = True
+        return True
 
     ### databases ###
 
     def require_database_alias(self,alias):
         """Check if there is alias row for <alias>"""
+        self._load_database()
         aliases = self.main.list_aliases()
         for a in aliases:
             if alias.startswith("%s_" % a) or alias == a:
@@ -33,7 +63,9 @@ class Database(object):
         raise RuntimeError('No alias found for database %s' % alias)
 
     def valid_dbtype(self):
-        """Check if <dbtype> is valid sql database type"""
+        """Check if <dbtype> is valid sql database type
+        """
+        self._load_database()
         if self.type in ['MYSQL','POSTGRESQL']:
             return True
         return False
@@ -42,7 +74,9 @@ class Database(object):
         """Get user's <database> on <server>
         return database object on success
         raise DoesNotExist if does not exist
-        raise RuntimeError on database error"""
+        raise RuntimeError on database error
+        """
+        self._load_database()
         serv = self.get_sql_server(server)
         query = self.main.session.query(self.main.Databases).filter(self.main.Databases.server==serv.server)
         query = query.filter(self.main.Databases.database_name == str(database))
@@ -74,7 +108,9 @@ class Database(object):
     def list_sql_databases(self):
         """List all user's databases
         returns list of database objects
-        raises RuntimeError on error"""
+        raises RuntimeError on error
+        """
+        self._load_database()
         if not self.valid_dbtype():
             raise RuntimeError('Invalid database type %s' % self.type)
         query = self.main.session.query(self.main.Databases)
@@ -98,7 +134,9 @@ class Database(object):
             raise RuntimeError('Database error %s' % e)
 
     def add_sql_database(self,server,database,username=None):
-        """Add <database> to server <server> for user"""
+        """Add <database> to server <server> for user
+        """
+        self._load_database()
         if username == None:
             username = database
         if self.main.customer_id is None:
@@ -117,7 +155,7 @@ class Database(object):
         # require alias
         self.require_database_alias(database)
         self.require_database_alias(username)
-        
+
         try:
             self.get_sql_database(server,database)
             raise AlreadyExist('Database %s already exist' % database)
@@ -131,7 +169,7 @@ class Database(object):
         db.database_type = self.type
         db.approved = True
         db.t_customers_id = self.main.customer_id
-        
+
         try:
             self.main.session.add(db)
             self.main.session.commit()
@@ -145,13 +183,15 @@ class Database(object):
 
     def del_sql_database(self,server,database):
         """Delete <dbype> <database> on <server>
-        Used as lazy operation, server removes"""
+        Used as lazy operation, server removes
+        """
+        self._load_database()
         if not self.valid_dbtype():
             raise RuntimeError('Invalid database type %s' % self.type)
         if self.main.customer_id is None:
             raise RuntimeError('Select user first')
         serv = self.get_sql_server(server)
-        db = self.get_mysql_database(server,database)
+        db = self.get_sql_database(server,database)
         self.main.session.delete(db)
         try:
             self.main.session.commit()
@@ -164,17 +204,19 @@ class Database(object):
             raise RuntimeError('Cannot delete mysql database %s on %s' % (database, server))
 
     def get_sql_server(self,server):
-        """Get list of mysql servers"""
+        """Get list of mysql servers
+        """
+        self._load_database()
         if not self.valid_dbtype():
             raise RuntimeError('Invalid database type %s' % self.type)
         try:
-            retval = self.main.session.query(self.main.Database_servers).filter(self.main.Database_servers.server==server)
-            retval = retval.filter(self.main.Databases.database_type == self.type).one()
+            retval = self.main.session.query(self.main.Database_servers).filter(self.main.Database_servers.server == server)
+            retval = retval.filter(self.main.Database_servers.database_type == self.type).one()
             self.main.session.commit()
             return retval
         except NoResultFound:
             self.main.session.rollback()
-            raise DoesNotFound('Database server %s does not exist' % server)
+            raise DoesNotExist('Database server %s does not exist' % server)
         except IntegrityError as e:
             self.main.session.rollback()
             self.log.exception(e)
@@ -188,7 +230,9 @@ class Database(object):
             raise RuntimeError('Cannot get database server %s' % server)
 
     def list_sql_servers(self):
-        """Get list of database servers"""
+        """Get list of database servers
+        """
+        self._load_database()
         if not self.valid_dbtype():
             raise RuntimeError('Invalid database type %s' % self.type)
         try:
@@ -216,6 +260,7 @@ class MySQL(Database):
         self.type = 'MYSQL'
         self.log = logging.getLogger('services.databases')
         self.main = main
+        self.database_loaded = False
 
     def list(self):
         """List all user's databases
@@ -253,9 +298,10 @@ class MySQL(Database):
 
 class PostgreSQL(Database):
     def __init__(self,main):
-        super(Database,self).__init__(main)
+        super(Database,self).__init__()
         self.main = main
         self.type = 'POSTGRESQL'
+        self.database_loaded = False
         self.log = logging.getLogger('services.databases')
 
     def list(self):

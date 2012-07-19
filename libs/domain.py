@@ -10,15 +10,18 @@ Licensed under MIT-license
 Kapsi Internet-käyttäjät ry 2012
 """
 
-from exceptions import *
+from services.exceptions import *
 import logging
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
+from sqlalchemy import MetaData, Table, Column, Integer, ForeignKey
+from sqlalchemy.orm import mapper
 
 class Domains(object):
     def __init__(self,main):
         self.main = main
         self.log = logging.getLogger('services.databases')
+
 
     def list(self):
         """List user all domains"""
@@ -55,7 +58,7 @@ class Domains(object):
         raise DoesNotExist('Domain %s not found' % domain)
 
     def add(self, domain, shared=False,dns=True, admin_address=None,
-                    domain_type='master', refresh_time=None, retry_time=None,
+                    domain_type='MASTER', refresh_time=None, retry_time=None,
                     expire_time=None, minimum_cache_time=None, ttl=None):
         """add domain for user"""
         new = self.main.Domains()
@@ -63,8 +66,8 @@ class Domains(object):
         new.name = domain
         new.shared = shared
         new.dns = dns
-        if domain_type.lower() in ['master', 'slave', 'none']:
-            new.domain_type = domain_type.lower()
+        if domain_type.upper() in ['MASTER', 'SLAVE', 'NONE']:
+            new.domain_type = domain_type.upper()
         elif domain_type:
             raise RuntimeError('Invalid domain type %s' % domain_type)
         if admin_address:
@@ -99,11 +102,12 @@ class Domains(object):
             self.main.session.commit()
         except OperationalError as e:
             self.log.exception(e)
-            self.reconnect()
+            self.main.session.rollback()
             raise RuntimeError('Operational error')
         except IntegrityError as e:
             self.log.exception(e)
-            raise RuntimeError('Cannot add domain %s' % name)
+            self.main.session.rollback()
+            raise RuntimeError('Cannot add domain %s' % domain)
 
         return True
 

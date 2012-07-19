@@ -11,21 +11,52 @@ Licensed under MIT-license
 Kapsi Internet-käyttäjät ry 2012
 """
 
-from exceptions import *
+from services.exceptions import *
 import logging
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
+from sqlalchemy import MetaData, Table, Column, Integer, Boolean, ForeignKey
+from sqlalchemy.orm import mapper, relationship
 
 class Mailboxes(object):
     def __init__(self,main):
         self.main = main
         self.log = logging.getLogger('services.mailboxes')
+        self.database_loaded = False
+        if not self.main.dynamic_load:
+            self._load_database()
+
+    def _load_database(self):
+        if self.database_loaded:
+            return True
+        mailbox = Table('mailboxes', self.main.metadata,
+            Column("t_mailboxes_id", Integer, primary_key=True),
+            Column("t_domains_id", Integer, ForeignKey('domains.t_domains_id')),
+            Column("t_customers_id", Integer, ForeignKey('customers.t_customers_id')),
+            autoload=True)
+        mapper(self.main.Mailboxes, mailbox, properties={
+            'customer': relationship(self.main.Customers, backref='mailboxes'),
+            'domain': relationship(self.main.Domains, backref='mailboxes')
+        })
+        mail_aliases = Table('mail_aliases', self.main.metadata,
+            Column('t_mail_aliases_id', Integer, primary_key=True),
+            Column("t_domains_id", Integer, ForeignKey('domains.t_domains_id')),
+            Column("t_customers_id", Integer, ForeignKey('customers.t_customers_id')),
+            Column("t_mailboxes_id", Integer, ForeignKey('mailboxes.t_mailboxes_id')),
+            autoload=True)
+        mapper(self.main.Mail_aliases, mail_aliases, properties={
+            'customer': relationship(self.main.Customers, backref='mail_aliases'),
+            'domain': relationship(self.main.Domains, backref='mail_aliases'),
+            'mailbox': relationship(self.main.Mailboxes, backref='mail_aliases')
+        })
+        self.database_loaded = True
 
     def check_email_address(self, address):
         """Validates given address
         Returns False if address is not valid
         Returns True if address is valid
         """
+        self._load_database()
         if '@' not in address or len(address) < 5 or len(address.split('@')) != 2:
             return False
         domain = address.split('@')[1]
@@ -39,7 +70,9 @@ class Mailboxes(object):
         """List all user mailboxes
         domain = (optional) limit mailboxes to this domain
         Returns list of mailbox objects
-        Returns RuntimeError if domain not found"""
+        Returns RuntimeError if domain not found
+        """
+        self._load_database()
         query = self.main.session.query(self.main.Mailboxes)
         if self.main.customer_id:
             query = query.filter(self.main.Mailboxes.t_customers_id==self.main.customer_id)
@@ -55,7 +88,9 @@ class Mailboxes(object):
 
     def get(self, address):
         """Get one mailbox
-        address = mailbox address"""
+        address = mailbox address
+        """
+        self._load_database()
         try:
             query = self.main.session.query(self.main.Mailboxes).filter(self.main.Mailboxes.name == address)
             if self.main.customer_id:
@@ -77,6 +112,7 @@ class Mailboxes(object):
         Raises RuntimeError on error
         Return True on successful insert
         """
+        self._load_database()
         domain = address.split('@')[1].encode('idna').decode()
         address = "%s@%s" % (address.split('@')[0], domain)
         if self.main.check_email_address(address) != True:
@@ -114,12 +150,12 @@ class Mailboxes(object):
             self.main.session.rollback()
             raise RuntimeError('Cannot add mailbox')
         return True
-        
-        
+
     def delete(self,mailbox):
         """Deletes mailbox
         mailbox = mailbox address eg. test@dom.tld
         """
+        self._load_database()
         try:
             mailbox = self.get(mailbox)
         except DoesNotExist:
@@ -136,6 +172,10 @@ class Mailboxes(object):
     ### mail aliases ###
 
     def list_aliases(self, domain=None):
+        """List all customers mail aliases
+        optionally filter by <domain>
+        """
+        self._load_database()
         query = self.main.session.query(self.main.Mail_aliases)
         if self.main.customer_id:
             query = query.filter(self.main.Mail_aliases.t_customers_id == self.main.customer_id)
@@ -154,7 +194,9 @@ class Mailboxes(object):
         mailbox = mailbox to add alias to
         alias = alias to add
         return True on successful insert
-        raise RuntimeError on error"""
+        raise RuntimeError on error
+        """
+        self._load_database()
         try:
             mailbox = self.get(mailbox)
         except DoesNotExist:
@@ -184,6 +226,7 @@ class Mailboxes(object):
         Return True on successful delete
         Raises RuntimeError on error
         """
+        self._load_database()
         try:
             mailbox = self.get(mailbox)
         except DoesNotExist:
