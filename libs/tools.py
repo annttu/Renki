@@ -78,3 +78,16 @@ def is_int(string):
         return True
     except:
         return False
+
+def idna_address(address):
+    """IDNA-encode mail-address"""
+    if len(address.split('@') < 2):
+        return idna_domain(address)
+    domainpart = address.split('@')[-1]
+    name = address.split('@')[:-1]
+    domainpart = domainpart.encode('idna').decode()
+    return '%s@%s' % (name, domainpart)
+
+def idna_domain(domain):
+    """IDNA-encode domain"""
+    return domain.encode('idna').decode()

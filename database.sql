@@ -793,7 +793,7 @@ t_domains.domain_type, t_domains.masters, t_domains.allow_transfer
 FROM t_domains
 JOIN t_customers USING (t_customers_id)
 JOIN t_users USING (t_customers_id)
-WHERE (( t_users.name = "current_user"()::text AND public.is_admin() IS NULL) OR public.is_admin())
+WHERE (( t_users.name = "current_user"()::text AND public.is_admin() IS FALSE) OR public.is_admin())
 -- if there many users in one customers
 GROUP BY t_domains.t_domains_id;
 

@@ -17,6 +17,8 @@ from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy import MetaData, Table, Column, Integer, ForeignKey
 from sqlalchemy.orm import mapper
 
+from services.libs.tools import is_int
+
 class Domains(object):
     def __init__(self,main):
         self.main = main
@@ -37,25 +39,41 @@ class Domains(object):
         except DatabaseError as e:
             raise RuntimeError(e)
 
-    def get(self, name):
+    def get(self, name=None, domain_id=None,getall=False):
         """Get user domain matching name"""
-        if not name:
-            return
-        name = name.split('.')
-        domain = ''
-        while len(name) > 0:
-            if len(domain) > 0:
-                domain = "%s.%s" % (name.pop(), domain)
-            else:
-                domain = name.pop()
-            search = self.main.session.query(self.main.Domains).filter(self.main.Domains.name == domain)
-            if self.main.customer_id:
-                search = search.filter(self.main.Domains.t_customers_id==self.main.customer_id)
-            search = search.all()
-            if len(search) == 1:
-                return search[0]
-        self.log.warning('Domain %s not found' % domain)
-        raise DoesNotExist('Domain %s not found' % domain)
+        if not name and not domain_id:
+            raise RuntimeError('Give either name or domain_id')
+        if name:
+            name = name.split('.')
+            domain = ''
+            while len(name) > 0:
+                if len(domain) > 0:
+                    domain = "%s.%s" % (name.pop(), domain)
+                else:
+                    domain = name.pop()
+                search = self.main.session.query(self.main.Domains).filter(self.main.Domains.name == domain)
+                if self.main.customer_id and not getall:
+                    search = search.filter(self.main.Domains.t_customers_id==self.main.customer_id)
+                search = search.all()
+                if len(search) == 1:
+                    return search[0]
+            self.log.warning('Domain %s not found' % domain)
+            raise DoesNotExist('Domain %s not found' % domain)
+        else:
+            if not is_int(domain_id):
+                raise RuntimeError('Invalid domain_id %s given' % domain_id)
+            try:
+                search = self.main.session.query(self.main.Domains).filter(self.main.Domains.t_domains_id == domain_id)
+                if self.main.customer_id and not getall:
+                    search = search.filter(self.main.Domains.t_customers_id==self.main.customer_id)
+                search = search.one()
+                self.main.session.commit()
+                return search
+            except NoResultFound:
+                raise DoesNotExist('Domain id %s does not found' % domain_id)
+            except Exception as e:
+                self.log.exception(e)
+                raise RuntimeError('Error while getting domain')
 
     def add(self, domain, shared=False,dns=True, admin_address=None,
                     domain_type='MASTER', refresh_time=None, retry_time=None,
@@ -72,6 +90,8 @@ class Domains(object):
             raise RuntimeError('Invalid domain type %s' % domain_type)
         if admin_address:
             new.admin_address = admin_address
+        else:
+            new.admin_address = self.main.defaults.hostmaster_address
         if refresh_time:
             if refresh_time >= 1 and refresh_time <= 9999999:
                 new.refresh_time = refresh_time
@@ -126,9 +146,9 @@ class Domains(object):
             raise RuntimeError('Domain %s does not found' % domain)
         for vhost in self.main.vhosts.list(domain):
             self.main.session.delete(vhost)
-        for mail_alias in self.main.mail.list_aliases(domain):
+        for mail_alias in self.main.mailboxes.list_aliases(domain):
             self.main.session.delete(mail_alias)
-        for mailbox in self.main.mail.list(domain):
+        for mailbox in self.main.mailboxes.list(domain):
             self.main.session.delete(mailbox)
         self.main.session.delete(dom)
         try:

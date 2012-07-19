@@ -127,6 +127,9 @@ class Vhosts(object):
         if addr is not None:
             try:
                 vhost = self.get(addr)
+                vhost.aliases = []
+                vhost.redirects = []
+                self.main.session.commit()
                 self.main.session.delete(vhost)
                 self.main.session.commit()
             except DoesNotExist:

@@ -9,16 +9,19 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 import logging
-from services import defaults
+try:
+    from services import defaults
+except ImportError:
+    import defaults
 
-from services.libs.database import MySQL, PostgreSQL
-from services.libs.domain import Domains
-from services.libs.vhost import Vhosts
-from services.libs.mail import Mailboxes
-from services.libs.user_port import User_ports
-from services.libs.host import Hosts
-from services.libs.subnet import Subnets
-from services.exceptions import DatabaseError, DoesNotExist, PermissionDenied
+from libs.database import MySQL, PostgreSQL
+from libs.domain import Domains
+from libs.vhost import Vhosts
+from libs.mail import Mailboxes
+from libs.user_port import User_ports
+from libs.host import Hosts
+from libs.subnet import Subnets
+from exceptions import DatabaseError, DoesNotExist, PermissionDenied
 
 logging.basicConfig()
 logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
