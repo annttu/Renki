@@ -6,7 +6,7 @@ vhost.py
 
 from services.exceptions import *
 import logging
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError, InternalError
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy import MetaData, Table, Column, Integer, ForeignKey
 from sqlalchemy.orm import mapper, relationship
@@ -71,7 +71,10 @@ class Vhosts(object):
             raise RuntimeError('Vhost name is mandatory argument!')
         else:
             try:
-                self.main.domains.get(name)
+                if self.main.admin_user:
+                    self.main.domains.get(name,getall=True)
+                else:
+                    self.main.domains.get(name)
             except DoesNotExist:
                 raise RuntimeError('Domain for vhost %s not found' % name)
         if redirect_to:
@@ -80,12 +83,18 @@ class Vhosts(object):
                 raise RuntimeError('Invalid redirect_to url %s given' % redirect_to)
         for alias in aliases:
             try:
-                self.main.domains.get(alias)
+                if self.main.admin_user:
+                    self.main.domains.get(alias,getall=True)
+                else:
+                    self.main.domains.get(alias)
             except DoesNotExist:
                 raise RuntimeError('Domain for alias %s not found' % alias)
         for redirect in redirects:
             try:
-                self.main.domains.get(redirect)
+                if self.main.admin_user:
+                    self.main.domains.get(redurect,getall=True)
+                else:
+                    self.main.domains.get(redirect)
             except DoesNotExist:
                 raise RuntimeError('Domain for redirect %s not found' % redirect)
         if not self.main.username or self.main.username == '':
@@ -100,7 +109,12 @@ class Vhosts(object):
         try:
             self.main.session.commit()
         except IntegrityError or OperationalError as e:
+            self.log.exception(e)
             self.main.reconnect()
+            raise RuntimeError(e)
+        except InternalError as e:
+            self.main.session.rollback()
+            self.log.exception(e)
             raise RuntimeError(e)
         return vhost.t_vhosts_id
 
@@ -189,7 +203,10 @@ class Vhosts(object):
                 vhosts = vhosts.filter(self.main.Vhosts.t_customers_id == self.main.customer_id)
             if domain:
                 try:
-                    dom = self.main.domains.get(domain)
+                    if self.main.admin_user:
+                        dom = self.main.domains.get(domain,getall=True)
+                    else:
+                        dom = self.main.domains.get(domain)
                     vhosts = vhosts.filter(self.main.Vhosts.t_domains_id == dom.t_domains_id)
                 except DoesNotExist as e:
                     raise RuntimeError(e)

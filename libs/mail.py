@@ -68,7 +68,7 @@ class Mailboxes(object):
             return False
         return True
 
-    def list(self, domain=None):
+    def list(self, domain=None,domain_id=None):
         """List all user mailboxes
         domain = (optional) limit mailboxes to this domain
         Returns list of mailbox objects
@@ -84,6 +84,8 @@ class Mailboxes(object):
             except DoesNotExist as e:
                 raise RuntimeError(e)
             query = query.filter(self.main.Mailboxes.t_domains_id == dom.t_domains_id)
+        elif domain_id:
+            query = query.filter(self.main.Mailboxes.t_domains_id == domain_id)
         retval = query.all()
         self.main.session.commit()
         return retval
@@ -164,7 +166,7 @@ class Mailboxes(object):
     """
     ### mail aliases ###
 
-    def list_aliases(self, domain=None):
+    def list_aliases(self, domain=None, domain_id=None):
         """List all customers mail aliases
         optionally filter by <domain>
         """
@@ -178,6 +180,8 @@ class Mailboxes(object):
             except DoesNotExist as e:
                 raise RuntimeError(e)
             query = query.filter(self.main.Mail_aliases.t_domains_id == dom.t_domains_id)
+        elif domain_id:
+            query = query.filter(self.main.Mail_aliases.t_domains_id == domain_id)
         retval = query.all()
         self.main.session.commit()
         return retval

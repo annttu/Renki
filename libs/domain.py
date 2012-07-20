@@ -12,6 +12,7 @@ Kapsi Internet-käyttäjät ry 2012
 
 from services.exceptions import *
 import logging
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy import MetaData, Table, Column, Integer, ForeignKey
@@ -53,11 +54,11 @@ class Domains(object):
                     domain = name.pop()
                 search = self.main.session.query(self.main.Domains).filter(self.main.Domains.name == domain)
                 if self.main.customer_id and not getall:
-                    search = search.filter(self.main.Domains.t_customers_id==self.main.customer_id)
+                    ## Get from domains owned by user and from shared domains
+                    search = search.filter(or_(self.main.Domains.t_customers_id==self.main.customer_id, self.main.Domains.shared == True))
                 search = search.all()
                 if len(search) == 1:
                     return search[0]
-            self.log.warning('Domain %s not found' % domain)
             raise DoesNotExist('Domain %s not found' % domain)
         else:
             if not is_int(domain_id):

@@ -116,27 +116,37 @@ CREATE OR REPLACE FUNCTION public.find_domain(domain text) RETURNS integer AS $$
         domainpart text;
         r RECORD;
         m text;
-
+        remain text;
+        customer_id integer;
     BEGIN
     IF domain IS NULL OR domain = '' THEN
       RETURN -1;
     ELSE
+      customer_id := users.t_customers_id FROM users WHERE users.name = CURRENT_USER;
       domainpart = domain;
       partarray = regexp_split_to_array(domain, '\.');
       FOREACH m IN ARRAY partarray
       LOOP
-        FOR r IN SELECT domains.t_domains_id as id
+        remain := regexp_replace(domain, '\.?' || domainpart || '$', '');
+        FOR r IN SELECT domains.t_domains_id as id, domains.shared as shared
         FROM domains
-        JOIN users USING (t_customers_id)
-        WHERE ( users.name = CURRENT_USER OR public.is_admin() )
+        WHERE ( domains.t_customers_id = customer_id OR public.is_admin() OR domains.shared = TRUE)
         AND domains.name =  domainpart
         AND (SELECT COUNT(*)
             FROM domains
-            WHERE ( users.name = CURRENT_USER OR public.is_admin() )
+            WHERE ( domains.t_customers_id = customer_id OR public.is_admin() OR domains.shared = TRUE)
             AND domains.name = domainpart
         ) = 1
         LOOP
-            RETURN r.id;
+            IF r.shared = TRUE THEN
+                IF public.require_alias(remain) = TRUE THEN
+                    RETURN r.id;
+                ELSE
+                    RAISE EXCEPTION 'No alias % found for vhost %', remain, domain;
+                END IF;
+            ELSE
+                RETURN r.id;
+            END IF;
         END LOOP;
         domainpart = regexp_replace(domainpart, '^' || m || '\.', '');
 
@@ -578,6 +588,32 @@ $f$ LANGUAGE plpgsql;
 
 GRANT EXECUTE ON FUNCTION services.ip_on_subnet(inet, integer) TO admins;
 
+DROP FUNCTION IF EXISTS public.require_alias(text);
+CREATE OR REPLACE FUNCTION public.require_alias(aliasname text)
+RETURNS BOOLEAN
+AS
+$f$
+DECLARE
+    alias text;
+BEGIN
+    FOR alias IN SELECT customers.t_customers_id
+                FROM users JOIN customers USING (t_customers_id) 
+                WHERE users.name = CURRENT_USER::text 
+                AND aliasname = ANY(customers.aliases) 
+        LOOP
+        IF alias IS NOT NULL THEN
+            RETURN TRUE;
+        END IF;
+    END LOOP;
+    RETURN FALSE;
+END;
+$f$ LANGUAGE plpgsql;
+
+GRANT EXECUTE ON FUNCTION public.require_alias(text) TO users;
+GRANT EXECUTE ON FUNCTION public.require_alias(text) TO admins;
+
+
+
 DROP FUNCTION IF EXISTS public.valid_database_name(text);
 CREATE OR REPLACE FUNCTION public.valid_database_name(database text)
 RETURNS BOOLEAN
@@ -597,7 +633,7 @@ BEGIN
                 FROM users JOIN customers USING (t_customers_id) 
                 WHERE users.name = CURRENT_USER::text LOOP
         IF alias IS NOT NULL THEN
-            regex := '^' || CURRENT_USER::text || '(_[a-z0-9_]+)?$';
+            regex := '^' || alias || '(_[a-z0-9_]+)?$';
             isvalid := database ~* regex;
             IF isvalid = TRUE THEN
                 RETURN TRUE;
@@ -793,7 +829,7 @@ t_domains.domain_type, t_domains.masters, t_domains.allow_transfer
 FROM t_domains
 JOIN t_customers USING (t_customers_id)
 JOIN t_users USING (t_customers_id)
-WHERE (( t_users.name = "current_user"()::text AND public.is_admin() IS FALSE) OR public.is_admin())
+WHERE ((( t_users.name = "current_user"()::text AND public.is_admin() IS FALSE) OR t_domains.shared = TRUE ) OR public.is_admin())
 -- if there many users in one customers
 GROUP BY t_domains.t_domains_id;
 

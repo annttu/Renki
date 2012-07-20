@@ -68,8 +68,9 @@ class Services():
         self.mailboxes = Mailboxes(self)
         self.user_ports = User_ports(self)
         if self.admin_user:
-            self.hosts = Hosts(self)
             self.subnets = Subnets(self)
+            self.hosts = Hosts(self)
+
 
 
     def connect(self, database=None,user=None,password=None,server=None, port=None):
