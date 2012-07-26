@@ -37,10 +37,11 @@ def on_first_connect_listener(target, context):
     log.info("Connecting to database...")
 
 class Services():
-    def __init__(self, username, password, server, verbose=False, database='services', dynamic_load=True):
+    def __init__(self, username, password, server, port=None, database='services', verbose=False, dynamic_load=True):
         self.db = None
         self.dynamic_load = dynamic_load
         self.database = database
+        self.database_port = port
         self.db_username = username
         self.db_password = password
         self.server=server
@@ -52,11 +53,17 @@ class Services():
         else:
             logging.getLogger('sqlalchemy.engine').setLevel(logging.ERROR)
         self.log = logging.getLogger('services')
-        self.connect()
         self.customer_id = None
         self.username = None
         self.session = None
         self.admin_user = False
+
+    def login(self):
+        self.connect()
+        try:
+            self.map_objects()
+        except Exception as e:
+            self.log.exception(e)
         self.getSession()
         if not self.session:
             raise RuntimeError('Invalid login')
@@ -71,14 +78,34 @@ class Services():
             self.subnets = Subnets(self)
             self.hosts = Hosts(self)
 
-
+    def commit_session(self):
+        self.session.commit()
+        self.session = None
 
     def connect(self, database=None,user=None,password=None,server=None, port=None):
-        self.db = create_engine('postgresql://%s:%s@%s/%s' % (self.db_username, self.db_password, self.server, self.database),
+        if not database:
+            database = self.database
+        if not user:
+            user = self.db_username
+        if not password:
+            password = self.db_password
+        if not server:
+            server = self.server
+        if not port:
+            port = self.database_port
+        if not port:
+            port = 5432
+        self.db = create_engine('postgresql://%s:%s@%s:%s/%s' % (user, password, server, port, database),
                                 encoding='utf-8', echo=self.verbose, pool_recycle=60)
 
-    def getSession(self):
+    def map_objects(self):
         """Function to get session"""
+        try:
+            if self.metadata:
+                # already mapped
+                return True
+        except:
+            pass
         try:
             metadata = MetaData(self.db)
             self.metadata = metadata
@@ -125,13 +152,20 @@ class Services():
                 'customer': relationship(self.Customers, backref='users'),
                 'domain': relationship(self.Domains, backref='users')
                 })
+            return True
+        except OperationalError as e:
+            self.log.exception(e)
+            raise DatabaseError('Cannot map objects')
+
+    def getSession(self):
+        try:
             Session = sessionmaker(bind=self.db)
             self.session = Session()
             self.admin_user = self.is_admin(self.username)
             event.listen(Pool, 'connect', on_connect_listener)
         except OperationalError as e:
             self.log.exception(e)
-            self.session = None
+            raise DatabaseError('Cannot get session')
 
     def reconnect(self):
         self.session.rollback()
@@ -160,13 +194,29 @@ class Services():
             self.session.rollback()
             raise RuntimeError('Cannot get users')
 
+    def get_customer_id(self):
+        if self.username != None:
+            user = self.session.query(self.Users).filter(self.Users.username == self.username)
+            try:
+                user = user.one()
+                return user.t_customers_id
+            except NoResultFound:
+                return None
+            except Exception as e:
+                self.session.rollback()
+                self.log.exception(e)
+                return None
+
     def get_current_user(self):
         """Get current selected user
         Raises DoesNotExist if no user found
         Raises RuntimeError on error"""
-        if self.customer_id != None and self.username != None:
-            user = self.session.query(self.Users).filter(self.Users.customers_id == self.customer_id)
-            user = user.filter(self.Users.name == self.username)
+        if self.customer_id != None or self.username != None:
+            user = self.session.query(self.Users)
+            if self.customer_id != None:
+                user = user.filter(self.Users.customers_id == self.customer_id)
+            if self.username != None:
+                user = user.filter(self.Users.name == self.username)
             try:
                 user = user.one()
                 self.session.commit()
@@ -265,7 +315,6 @@ class Services():
             self.session.close()
         except:
             pass
-
 
     class Domains(object):
         """Domain object

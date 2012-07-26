@@ -57,6 +57,13 @@ class Vhosts(object):
         self.database_loaded = True
         return True
 
+    def valid_name(self,name):
+        """Validate name"""
+        for char in name:
+            if char not in 'abcdefghijklmnopqrstuvwxyz0123456789._-*':
+                return False
+        return True
+
     def add(self,name,redirects=[], aliases=[], redirect_to=None):
         """Function to create vhost object
         name = vhost name (mandatory)
@@ -69,6 +76,8 @@ class Vhosts(object):
         self._load_database()
         if not name:
             raise RuntimeError('Vhost name is mandatory argument!')
+        if self.valid_name(name) is False:
+            raise RuntimeError('Vhost name %s is not valid' % name)
         else:
             try:
                 if self.main.admin_user:
@@ -77,11 +86,19 @@ class Vhosts(object):
                     self.main.domains.get(name)
             except DoesNotExist:
                 raise RuntimeError('Domain for vhost %s not found' % name)
+            try:
+                self.get(name)
+                raise RuntimeError('Name %s already exist' % name)
+            except DoesNotExist:
+                pass
+
         if redirect_to:
             redirect_to = redirect_to.lower()
             if not redirect_to.startswith('http://') and not redirect_to.startswith('https://'):
                 raise RuntimeError('Invalid redirect_to url %s given' % redirect_to)
         for alias in aliases:
+            if self.valid_name(alias) is False:
+                raise RuntimeError('Vhost alias name %s is not valid' % alias)
             try:
                 if self.main.admin_user:
                     self.main.domains.get(alias,getall=True)
@@ -89,14 +106,26 @@ class Vhosts(object):
                     self.main.domains.get(alias)
             except DoesNotExist:
                 raise RuntimeError('Domain for alias %s not found' % alias)
+            try:
+                self.get(alias)
+                raise RuntimeError('Alias %s already exist' % name)
+            except DoesNotExist:
+                pass
         for redirect in redirects:
+            if self.valid_name(redirect) is False:
+                raise RuntimeError('Vhost alias name %s is not valid' % redirect)
             try:
                 if self.main.admin_user:
-                    self.main.domains.get(redurect,getall=True)
+                    self.main.domains.get(redirect,getall=True)
                 else:
                     self.main.domains.get(redirect)
             except DoesNotExist:
                 raise RuntimeError('Domain for redirect %s not found' % redirect)
+            try:
+                self.get(redirect)
+                raise RuntimeError('Redirect %s already exist' % name)
+            except DoesNotExist:
+                pass
         if not self.main.username or self.main.username == '':
             raise RuntimeError('Select username first!')
         vhost = self.main.Vhosts()
@@ -152,7 +181,7 @@ class Vhosts(object):
     def get(self, addr, getall=True):
         """Get vhost object by address
         addr = address
-        all = don't limit results to current user vhosts
+        getall = don't limit results to current user vhosts
         """
         self._load_database()
         try:

@@ -123,7 +123,8 @@ CREATE OR REPLACE FUNCTION public.find_domain(domain text) RETURNS integer AS $$
       RETURN -1;
     ELSE
       customer_id := users.t_customers_id FROM users WHERE users.name = CURRENT_USER;
-      domainpart = domain;
+      domainpart = regexp_replace(domain,'\*','\\*');
+      RAISE NOTICE 'domainpart %', domainpart;
       partarray = regexp_split_to_array(domain, '\.');
       FOREACH m IN ARRAY partarray
       LOOP
@@ -148,7 +149,10 @@ CREATE OR REPLACE FUNCTION public.find_domain(domain text) RETURNS integer AS $$
                 RETURN r.id;
             END IF;
         END LOOP;
+        m := regexp_replace(m,'\*','\\\\\*');
+        RAISE NOTICE 'm %', m;
         domainpart = regexp_replace(domainpart, '^' || m || '\.', '');
+        RAISE NOTICE 'domainpart %', domainpart;
 
     END LOOP;
     END IF;
@@ -597,9 +601,9 @@ DECLARE
     alias text;
 BEGIN
     FOR alias IN SELECT customers.t_customers_id
-                FROM users JOIN customers USING (t_customers_id) 
-                WHERE users.name = CURRENT_USER::text 
-                AND aliasname = ANY(customers.aliases) 
+                FROM users JOIN customers USING (t_customers_id)
+                WHERE users.name = CURRENT_USER::text
+                AND aliasname = ANY(customers.aliases)
         LOOP
         IF alias IS NOT NULL THEN
             RETURN TRUE;
@@ -629,8 +633,8 @@ BEGIN
     IF isvalid = TRUE THEN
         RETURN TRUE;
     END IF;
-    FOR alias IN SELECT DISTINCT unnest(aliases) as alias 
-                FROM users JOIN customers USING (t_customers_id) 
+    FOR alias IN SELECT DISTINCT unnest(aliases) as alias
+                FROM users JOIN customers USING (t_customers_id)
                 WHERE users.name = CURRENT_USER::text LOOP
         IF alias IS NOT NULL THEN
             regex := '^' || alias || '(_[a-z0-9_]+)?$';
@@ -1052,7 +1056,7 @@ CREATE TABLE services.t_vhosts
             redirect_to IS NULL
             AND is_redirect
         )),
-    CONSTRAINT valid_name CHECK (name ~* '^[a-z0-9\.\-]*$')
+    CONSTRAINT valid_name CHECK (name ~* '^[a-z0-9\.\-\^*]*$')
 );
 
 ALTER TABLE services.t_vhosts add unique(t_domains_id, name);
