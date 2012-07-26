@@ -36,8 +36,11 @@ def on_first_connect_listener(target, context):
     log = logging.getLogger('services')
     log.info("Connecting to database...")
 
-class Services():
+class Services(object):
+    print('__services__')
     def __init__(self, username, password, server, port=None, database='services', verbose=False, dynamic_load=True):
+        print("__init__")
+        self.__picklethis__ = {}
         self.db = None
         self.dynamic_load = dynamic_load
         self.database = database
@@ -48,13 +51,14 @@ class Services():
         self.verbose = verbose
         self.defaults = defaults
         self.metadata = None
+        self.loaded = False
         if self.verbose:
             logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
         else:
             logging.getLogger('sqlalchemy.engine').setLevel(logging.ERROR)
         self.log = logging.getLogger('services')
         self.customer_id = None
-        self.username = None
+        self.username = self.db_username
         self.session = None
         self.admin_user = False
 
@@ -67,7 +71,12 @@ class Services():
         self.getSession()
         if not self.session:
             raise RuntimeError('Invalid login')
-        self.db_password = None
+        del self.db_password
+        if self.username:
+            self.customer_id = self.get_current_user().t_customers_id
+        self.load_modules()
+
+    def load_modules(self):
         self.mysql = MySQL(self)
         self.postgresql = PostgreSQL(self)
         self.domains = Domains(self)
@@ -83,6 +92,8 @@ class Services():
         self.session = None
 
     def connect(self, database=None,user=None,password=None,server=None, port=None):
+        if self.db:
+            return
         if not database:
             database = self.database
         if not user:
@@ -101,7 +112,7 @@ class Services():
     def map_objects(self):
         """Function to get session"""
         try:
-            if self.metadata:
+            if self.metadata or self.loaded:
                 # already mapped
                 return True
         except:
@@ -152,6 +163,7 @@ class Services():
                 'customer': relationship(self.Customers, backref='users'),
                 'domain': relationship(self.Domains, backref='users')
                 })
+            self.loaded = True
             return True
         except OperationalError as e:
             self.log.exception(e)
@@ -214,7 +226,7 @@ class Services():
         if self.customer_id != None or self.username != None:
             user = self.session.query(self.Users)
             if self.customer_id != None:
-                user = user.filter(self.Users.customers_id == self.customer_id)
+                user = user.filter(self.Users.t_customers_id == self.customer_id)
             if self.username != None:
                 user = user.filter(self.Users.name == self.username)
             try:
@@ -315,6 +327,30 @@ class Services():
             self.session.close()
         except:
             pass
+
+    def __getstate__(self):
+        """Used when pickle unloads module"""
+        mydict = {'url': self.db.url}
+        types = [type(''), type(1), type(None), type(True)]
+        for c in self.__dict__:
+            if type(self.__dict__[c]) in types:
+                mydict[c] = self.__dict__[c]
+        return mydict
+
+    def __setstate__(self, d):
+        """Used when pickle loads object"""
+        self.__dict__.update(d)
+        print(self.Domains)
+        Services.__init__(self, d['url'].username, d['url'].password, d['url'].host,
+                port=d['url'].port, database=d['url'].database, verbose=d['verbose'], dynamic_load=d['dynamic_load'])
+        self.__dict__.update(d)
+        self.login()
+
+    def __getnewargs__(self):
+        """Get new object arguments"""
+        return ({'username':self.db.url.username, 'password':self.db.url.password, 'server':self.db.url.host,
+                'port':self.db.url.port, 'database':self.db.url.database, 'verbose':self.verbose, 'dynamic_load':self.dynamic_load},)
+
 
     class Domains(object):
         """Domain object
