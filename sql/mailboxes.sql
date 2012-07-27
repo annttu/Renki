@@ -27,8 +27,8 @@ CREATE TABLE services.t_mail_aliases (
 
 ALTER TABLE t_mail_aliases ADD CONSTRAINT valid_name CHECK (lower(name) ~* $t$^[a-z0-9\.!#$%&'*+-/=?^_`{|}~]+$$t$);
 
-SELECT create_log_triggers('services.t_mail_aliases');
-SELECT create_log_triggers('services.t_mailboxes');
+SELECT create_log_triggers('services.t_mail_aliases'::text);
+SELECT create_log_triggers('services.t_mailboxes'::text);
 
 DROP VIEW public.mailboxes;
 CREATE OR REPLACE VIEW public.mailboxes

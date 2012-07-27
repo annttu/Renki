@@ -28,7 +28,7 @@ GRANT USAGE ON services.t_services_t_services_id_seq TO admins;
 GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_services TO admins;
 GRANT SELECT ON services.t_services TO servers;
 
-SELECT create_log_triggers('services.t_services');
+SELECT create_log_triggers('services.t_services'::text);
 
 -- Populate t_service_types
 insert into t_service_types (service_category, service_type) VALUES ('DATABASE','MYSQL');
@@ -63,7 +63,7 @@ CREATE TABLE services.t_user_ports
 ALTER TABLE t_user_ports ADD CONSTRAINT valid_port CHECK ((port > 1024 AND port <= 30000 ) OR ( port >= 40000 AND port < 65536));
 ALTER TABLE t_user_ports ADD UNIQUE (port, t_services_id);
 
-SELECT services.create_log_triggers('services.t_user_ports');
+SELECT services.create_log_triggers('services.t_user_ports'::text);
 
 CREATE OR REPLACE VIEW public.user_port_servers
 AS
@@ -212,7 +212,7 @@ GRANT SELECT,UPDATE,DELETE,INSERT ON services.t_databases TO admins;
 GRANT SELECT ON services.t_databases TO users;
 
 -- create log rules
-SELECT services.create_log_triggers('services.t_databases');
+SELECT services.create_log_triggers('services.t_databases'::text);
 
 -- Database servers view
 

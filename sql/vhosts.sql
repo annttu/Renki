@@ -31,7 +31,7 @@ CREATE TABLE services.t_vhosts
 
 ALTER TABLE services.t_vhosts add unique(t_domains_id, name);
 
-SELECT create_log_triggers('services.t_vhosts');
+SELECT create_log_triggers('services.t_vhosts'::text);
 
 CREATE OR REPLACE VIEW public.vhosts
 AS

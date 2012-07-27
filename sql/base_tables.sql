@@ -45,7 +45,7 @@ CREATE TABLE services.t_customers (
 
 GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_customers TO admins;
 
-SELECT services.create_log_triggers('services.t_customers');
+SELECT services.create_log_triggers('services.t_customers'::text);
 
 -- mainly for Kapsi's needs
 
@@ -56,7 +56,7 @@ CREATE TABLE services.t_aliases
     alias text NOT NULL UNIQUE
 );
 
-SELECT create_log_triggers('services.t_aliases');
+SELECT create_log_triggers('services.t_aliases'::text);
 
 GRANT SELECT,UPDATE,INSERT,DELETE ON services.t_aliases TO admins;
 GRANT USAGE ON services.t_aliases_t_aliases_id_seq TO admins;
@@ -83,7 +83,7 @@ CREATE TABLE services.t_domains (
     allow_transfer inet[]
 );
 
-SELECT create_log_triggers('services.t_domains');
+SELECT create_log_triggers('services.t_domains'::text);
 
 ALTER TABLE t_domains ADD CONSTRAINT "domains_check" CHECK (
     refresh_time >= 1
@@ -115,7 +115,7 @@ CREATE TABLE services.t_domain_dns_keys (
     t_dns_keys_id integer NOT NULL
 );
 
-SELECT create_log_triggers('services.t_dns_keys');
+SELECT create_log_triggers('services.t_dns_keys'::text);
 
 -- USERS
 
@@ -134,7 +134,7 @@ CREATE TABLE services.t_users (
 
 GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_users TO admins;
 
-SELECT create_log_triggers('services.t_users');
+SELECT create_log_triggers('services.t_users'::text);
 
 CREATE OR REPLACE VIEW public.users AS
     SELECT t_users.t_customers_id, t_users.name, t_users.lastname, t_users.firstnames, t_users.phone,

@@ -21,7 +21,7 @@ CREATE TABLE services.t_subnets
 ALTER TABLE services.t_subnets ADD CONSTRAINT "vlan_tag_check" CHECK (vlan_tag >= 0 AND vlan_tag <= 65536);
 ALTER TABLE services.t_subnets ADD CONSTRAINT "valid mtu" CHECK (mtu >= 0 AND mtu <= 15500);
 
-SELECT create_log_triggers('services.t_subnets');
+SELECT create_log_triggers('services.t_subnets'::text);
 
 ------------------------------
 -- Hosts aka. computers etc --
@@ -40,7 +40,7 @@ CREATE TABLE services.t_hosts
 ALTER TABLE services.t_hosts ADD CONSTRAINT valid_name CHECK (name ~* '^[a-z0-9]+$');
 ALTER TABLE services.t_hosts ADD UNIQUE (name, t_domains_id);
 
-SELECT services.create_log_triggers('t_hosts');
+SELECT services.create_log_triggers('t_hosts'::text);
 
 ----------------
 -- Interfaces --
@@ -67,4 +67,4 @@ GRANT USAGE ON services.t_addresses_t_addresses_id_seq TO admins;
 GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_addresses TO admins;
 GRANT SELECT ON services.t_addresses TO servers;
 
-SELECT create_log_triggers('services.t_addresses');
+SELECT create_log_triggers('services.t_addresses'::text);
