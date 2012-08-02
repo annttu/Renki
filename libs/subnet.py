@@ -31,12 +31,12 @@ class Subnets(object):
         self.log = logging.getLogger('services.subnets')
         self.main.require_admin()
         self.database_loaded = False
-        if not self.main.dynamic_load:
+        if not self.main.dynamic_load and not self.main.loaded:
             self._load_database()
 
     def _load_database(self):
         """Dynamically load database when needed"""
-        if self.database_loaded:
+        if self.database_loaded or (self.main.loaded and not self.main.dynamic_load):
             return True
         subnets = Table('t_subnets', self.main.metadata,
             Column("t_subnets_id", Integer, primary_key=True),

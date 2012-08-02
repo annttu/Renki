@@ -22,12 +22,12 @@ class Vhosts(object):
         self.main = main
         self.log = logging.getLogger('services.vhosts')
         self.database_loaded = False
-        if not self.main.dynamic_load:
+        if not self.main.dynamic_load and not self.main.loaded:
             self._load_database()
 
     def _load_database(self):
         """Dynamically load database when needed"""
-        if self.database_loaded:
+        if self.database_loaded or (self.main.loaded and not self.main.dynamic_load):
             return True
         vhosts = Table('vhosts', self.main.metadata,
                 Column("t_vhosts_id", Integer, primary_key=True),
@@ -178,48 +178,65 @@ class Vhosts(object):
             except DoesNotExist:
                 raise RuntimeError('Vhost %s not found' % addr)
 
-    def get(self, addr, getall=True):
+    def get(self, addr=None,vhost_id=None, getall=True):
         """Get vhost object by address
         addr = address
+        vhost_id = vhosts id
         getall = don't limit results to current user vhosts
         """
         self._load_database()
-        try:
-            vhost = self.main.session.query(self.main.Vhosts).filter(self.main.Vhosts.name == addr)
-            if self.main.customer_id and not getall:
-                vhost = vhost.filter(self.main.Vhosts.t_customers_id == self.main.customer_id)
-            if self.main.username and not getall:
-                vhost = vhost.filter(self.main.Vhosts.username == self.main.username)
-            retval = vhost.one()
-            self.main.session.commit()
-            return retval
-        except NoResultFound:
-            self.main.session.rollback()
-            pass
-        try:
-            vhost = self.main.session.query(self.main.Vhosts).filter(':alias = ANY (aliases)').params(alias=addr)
-            if self.main.customer_id and not getall:
-                vhost = vhost.filter(self.main.Vhosts.t_customers_id == self.main.customer_id)
-            if self.main.username and not getall:
-                vhost = vhost.filter(self.main.Vhosts.username == self.main.username)
-            retval = vhost.one()
-            self.main.session.commit()
-            return retval
-        except NoResultFound:
-            self.main.session.rollback()
-            pass
-        try:
-            vhost = self.main.session.query(self.main.Vhosts).filter(':alias = ANY (redirects)').params(alias=addr)
-            if self.main.customer_id and not getall:
-                vhost = vhost.filter(self.main.Vhosts.t_customers_id == self.main.customer_id)
-            if self.main.username and not getall:
-                vhost = vhost.filter(self.main.Vhosts.username == self.main.username)
-            retval = vhost.one()
-            self.main.session.commit()
-            return retval
-        except NoResultFound:
-            self.main.session.rollback()
-            raise DoesNotExist('Vhost %s not found' % addr)
+        if not addr and not vhost_id:
+            return None
+        if vhost_id:
+            try:
+                vhost = self.main.session.query(self.main.Vhosts).filter(self.main.Vhosts.t_vhosts_id == vhost_id)
+                if self.main.customer_id and not getall:
+                    vhost = vhost.filter(self.main.Vhosts.t_customers_id == self.main.customer_id)
+                if self.main.username and not getall:
+                    vhost = vhost.filter(self.main.Vhosts.username == self.main.username)
+                retval = vhost.one()
+                self.main.session.commit()
+                return retval
+            except NoResultFound:
+                self.main.session.rollback()
+                raise DoesNotExist('Vhost %s does not found' % vhost_id)
+        if addr:
+            try:
+                vhost = self.main.session.query(self.main.Vhosts).filter(self.main.Vhosts.name == addr)
+                if self.main.customer_id and not getall:
+                    vhost = vhost.filter(self.main.Vhosts.t_customers_id == self.main.customer_id)
+                if self.main.username and not getall:
+                    vhost = vhost.filter(self.main.Vhosts.username == self.main.username)
+                retval = vhost.one()
+                self.main.session.commit()
+                return retval
+            except NoResultFound:
+                self.main.session.rollback()
+                pass
+            try:
+                vhost = self.main.session.query(self.main.Vhosts).filter(':alias = ANY (aliases)').params(alias=addr)
+                if self.main.customer_id and not getall:
+                    vhost = vhost.filter(self.main.Vhosts.t_customers_id == self.main.customer_id)
+                if self.main.username and not getall:
+                    vhost = vhost.filter(self.main.Vhosts.username == self.main.username)
+                retval = vhost.one()
+                self.main.session.commit()
+                return retval
+            except NoResultFound:
+                self.main.session.rollback()
+                pass
+            try:
+                vhost = self.main.session.query(self.main.Vhosts).filter(':alias = ANY (redirects)').params(alias=addr)
+                if self.main.customer_id and not getall:
+                    vhost = vhost.filter(self.main.Vhosts.t_customers_id == self.main.customer_id)
+                if self.main.username and not getall:
+                    vhost = vhost.filter(self.main.Vhosts.username == self.main.username)
+                retval = vhost.one()
+                self.main.session.commit()
+                return retval
+            except NoResultFound:
+                self.main.session.rollback()
+                raise DoesNotExist('Vhost %s not found' % addr)
 
 
     def list(self, domain=None):

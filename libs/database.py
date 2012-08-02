@@ -24,16 +24,16 @@ class Database(object):
         self.log = logging.getLogger('services.databases')
         self.type = ''
         self.database_loaded = False
-        if not self.main.dynamic_load:
+        if not self.main.dynamic_load and not self.main.loaded:
             self._load_database()
 
     def _load_database(self):
         """Load database when needed"""
-        if self.database_loaded:
+        if self.database_loaded or (self.main.loaded and not self.main.dynamic_load):
             return True
         try:
             # test if already loaded
-            self.main.Database._sa_class_manager
+            self.main.Databases._sa_class_manager
             self.database_loaded = True
             return
         except:
@@ -69,6 +69,29 @@ class Database(object):
         if self.type in ['MYSQL','POSTGRESQL']:
             return True
         return False
+
+    def get_sql_database_by_id(self, database_id):
+        """Get users database by t_databases_id
+        return databases object on success
+        raises DoesnotExist if not found"""
+        self._load_database()
+        query = self.main.session.query(self.main.Databases).filter(self.main.Databases.t_databases_id == database_id)
+        if self.main.customer_id:
+            query = query.filter(self.main.Databases.t_customers_id==self.main.customer_id)
+        else:
+            self.main.require_admin()
+        try:
+            query = query.filter(self.main.Databases.database_type==self.type)
+            retval = query.one()
+            self.main.session.commit()
+            return retval
+        except NoResultFound:
+            self.main.session.rollback()
+            raise DoesNotExist('Database %s does not exist' % database_id)
+        except Exception as e:
+            self.main.log.exception(e)
+            self.main.session.rollback()
+            raise RuntimeError('Database error %s' % e)
 
     def get_sql_database(self,server,database):
         """Get user's <database> on <server>
@@ -251,47 +274,59 @@ class Database(object):
             self.log.error('Cannot get mysql database list')
             raise RuntimeError('Cannot get database server list')
 
-
-### MySQL ###
-
-class MySQL(Database):
-    def __init__(self,main):
-        super(Database,self).__init__()
-        self.type = 'MYSQL'
-        self.log = logging.getLogger('services.databases')
-        self.main = main
-        self.database_loaded = False
-
     def list(self):
         """List all user's databases
         returns list of database objects
         raises RuntimeError on error"""
         return self.list_sql_databases()
 
+    def get_by_id(self,database_id):
+        """Get user's database by
+        t_databases_id
+        """
+        return self.get_sql_database_by_id(database_id)
+
     def get(self,server,database):
-        """Get user's mysql <database> on <server>
+        """Get user's <database> on <server>
         return database object on success
         raise DoesNotExist if does not exist
         raise RuntimeError on database error"""
         return self.get_sql_database(server,database)
 
-    def add(self,server,database,username=None):
-        """Add mysql <database> to server <server> for user"""
+    def add(self,server,database,username=''):
+        """Add <database> to server <server> for user"""
         return self.add_sql_database(server,database,username)
 
     def delete(self,server,database):
-        """Delete mysql <database> on <server>
+        """Delete <database> on <server>
         Used as lazy operation, server removes"""
         return self.del_sql_database(server,database)
 
-
     def list_servers(self):
-        """Get list of mysql servers"""
+        """Get list of database servers"""
         return self.list_sql_servers()
 
     def get_server(self,server):
-        """Get list of mysql servers"""
+        """Get database server"""
         return self.get_sql_server(server)
+
+
+
+### MySQL ###
+
+class MySQL(Database):
+    def __init__(self,main):
+        super(Database,self).__init__()
+        Database.__init__(self, main)
+        #Database.__init__(self)
+        self.type = 'MYSQL'
+        self.log = logging.getLogger('services.databases')
+        #self.main = main
+        if not self.valid_dbtype():
+            raise RuntimeError('Invalid database type %s' % self.type)
+        self.database_loaded = False
+        if not self.main.dynamic_load and not self.main.loaded:
+            self._load_database()
 
 
 ### PostgreSQL ###
@@ -299,38 +334,12 @@ class MySQL(Database):
 class PostgreSQL(Database):
     def __init__(self,main):
         super(Database,self).__init__()
+        #Database.__init__(self)
         self.main = main
         self.type = 'POSTGRESQL'
         self.database_loaded = False
         self.log = logging.getLogger('services.databases')
-
-    def list(self):
-        """List all user's databases
-        returns list of database objects
-        raises RuntimeError on error"""
-        return self.list_sql_databases()
-
-    def get(self,server,database):
-        """Get user's postgres <database> on <server>
-        return database object on success
-        raise DoesNotExist if does not exist
-        raise RuntimeError on database error"""
-        return self.get_sql_database(server,database)
-
-    def add(self,server,database,username=''):
-        """Add mysql <database> to server <server> for user"""
-        # check database name validity
-        return self.add_sql_database(server,database,username)
-
-    def delete(self,server,database):
-        """Delete mysql <database> on <server>
-        Used as lazy operation, server removes"""
-        return self.del_sql_database(server,database)
-
-    def list_servers(self):
-        """Get list of mysql servers"""
-        return self.list_sql_servers()
-
-    def get_server(self,server):
-        """Get list of mysql servers"""
-        return self.get_sql_server(server)
+        if not self.valid_dbtype():
+            raise RuntimeError('Invalid database type %s' % self.type)
+        if not self.main.dynamic_load and not self.main.loaded:
+            self._load_database()

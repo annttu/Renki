@@ -4,7 +4,7 @@ from sqlalchemy import *
 from sqlalchemy.dialects.postgresql import *
 from sqlalchemy import event
 from sqlalchemy.pool import Pool
-from sqlalchemy.orm import mapper, sessionmaker, relationship
+from sqlalchemy.orm import mapper, sessionmaker, relationship, clear_mappers
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
@@ -22,6 +22,7 @@ from libs.user_port import User_ports
 from libs.host import Hosts
 from libs.subnet import Subnets
 from exceptions import DatabaseError, DoesNotExist, PermissionDenied
+from types import INETARRAY
 
 logging.basicConfig()
 logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
@@ -37,9 +38,7 @@ def on_first_connect_listener(target, context):
     log.info("Connecting to database...")
 
 class Services(object):
-    print('__services__')
     def __init__(self, username, password, server, port=None, database='services', verbose=False, dynamic_load=True):
-        print("__init__")
         self.__picklethis__ = {}
         self.db = None
         self.dynamic_load = dynamic_load
@@ -77,6 +76,8 @@ class Services(object):
         self.load_modules()
 
     def load_modules(self):
+        if self.loaded:
+            return
         self.mysql = MySQL(self)
         self.postgresql = PostgreSQL(self)
         self.domains = Domains(self)
@@ -86,6 +87,7 @@ class Services(object):
         if self.admin_user:
             self.subnets = Subnets(self)
             self.hosts = Hosts(self)
+        self.loaded = True
 
     def commit_session(self):
         self.session.commit()
@@ -118,8 +120,11 @@ class Services(object):
         except:
             pass
         try:
+            print("Mapping objects!")
             metadata = MetaData(self.db)
             self.metadata = metadata
+            # TODO: this is needed, but why?
+            clear_mappers()
             ## map tables to
             event.listen(Pool, 'first_connect', on_first_connect_listener)
             customers = Table('customers', metadata,
@@ -129,6 +134,9 @@ class Services(object):
                 #,
                 #autoload=True)
             mapper(self.Customers, customers)
+        except OperationalError as e:
+            self.log.exception(e)
+        try:
             domains = Table('domains', self.metadata,
                 Column("t_domains_id", Integer, primary_key=True),
                 Column("name", String,nullable=False),
@@ -142,12 +150,15 @@ class Services(object):
                 Column('ttl', Integer, nullable=False, default=text('10800')),
                 Column('admin_address', String, nullable=True),
                 Column('domain_type', Enum('MASTER', 'SLAVE', 'NONE'), primary_key=False, nullable=False, default=text("'MASTER'::domain_type")),
-                Column('masters', ARRAY(INET()), primary_key=False),
-                Column('allow_transfer', ARRAY(INET()), primary_key=False))
+                Column('masters', INETARRAY(), primary_key=False),
+                Column('allow_transfer', INETARRAY(), primary_key=False))
                 #autoload=True)
             mapper(self.Domains, domains, properties={
                 'customer': relationship(self.Customers, backref='domains'),
             })
+        except OperationalError as e:
+            self.log.exception(e)
+        try:
             users = Table('users', metadata,
                 Column("t_users_id", Integer, primary_key=True),
                 Column("t_customers_id", Integer, ForeignKey('customers.t_customers_id')),
@@ -163,11 +174,9 @@ class Services(object):
                 'customer': relationship(self.Customers, backref='users'),
                 'domain': relationship(self.Domains, backref='users')
                 })
-            self.loaded = True
             return True
         except OperationalError as e:
             self.log.exception(e)
-            raise DatabaseError('Cannot map objects')
 
     def getSession(self):
         try:
@@ -260,7 +269,7 @@ class Services(object):
             self.session.rollback()
             self.reconnect()
         try:
-            retval = self.session.query(self.Users).filter(self.Users.name == username).one()
+            retval = self.session.query(self.Users).filter(self.Users.name == str(username)).one()
             self.session.commit()
             return retval.admin
         except Exception as e:
@@ -340,7 +349,6 @@ class Services(object):
     def __setstate__(self, d):
         """Used when pickle loads object"""
         self.__dict__.update(d)
-        print(self.Domains)
         Services.__init__(self, d['url'].username, d['url'].password, d['url'].host,
                 port=d['url'].port, database=d['url'].database, verbose=d['verbose'], dynamic_load=d['dynamic_load'])
         self.__dict__.update(d)

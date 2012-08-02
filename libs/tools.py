@@ -4,6 +4,7 @@
 """Miscellaneous tools for services library"""
 
 import struct
+import re
 
 def valid_ipv6_address(address):
     """Validate ipv6 address"""
@@ -14,7 +15,7 @@ def valid_ipv6_address(address):
 
 def valid_ipv4_address(address):
     """Validate ipv4 address"""
-    if re.match('^((25[0-5]|[0-2][0-4][0-9]|[0-9][0-9]).){4,4}(/30)?$'):
+    if re.match('^((25[012345]|2[01234][0-9]|[0-1]?[0-9]?[0-9])\.){3,3}(25[012345]|2[01234][0-9]|[0-1]?[0-9]?[0-9])(/30)?$', address):
         return True
     return False
 
@@ -27,7 +28,7 @@ def valid_ipv6_block(address):
 
 def valid_ipv4_block(address):
     """Validate ipv4 block"""
-    if re.match('^((25[0-5]|[0-2][0-4][0-9]|[0-9][0-9]).){4,4}/([89]|[0-3][0-9])$'):
+    if re.match('^((25[0-5]|[0-2][0-4][0-9]|[0-9][0-9]).){4,4}/([89]|[0-3][0-9])$', address):
         return True
     return False
 
@@ -53,7 +54,6 @@ def ipv6_in_block(ip,net):
    if len(ip.split(':')) != 8:
        return False
    ipaddr = ''.join([ '%04x' % int(x) for x in ip.split(':') ])
-   print("%s %s" % (ip,ipaddr))
    ipaddr = int(ipaddr, 16)
    net,bits = net.split('/')
    netlen = 9 - len(net.split(':'))
@@ -66,7 +66,6 @@ def ipv6_in_block(ip,net):
    if len(net.split(':')) != 8:
        return False
    netaddr = ''.join([ '%04x' % int(x) for x in net.split(':') ])
-   print("%s %s" % (net, netaddr))
    netaddr = int(netaddr, 16)
    mask = (0xffffffffffffffffffffffffffffffff << (128 - int(bits))) & 0xffffffffffffffffffffffffffffffff
    return (ipaddr & mask) == (netaddr & mask)

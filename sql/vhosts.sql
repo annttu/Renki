@@ -16,6 +16,7 @@ CREATE TABLE services.t_vhosts
     logaccess boolean default false not null,
     redirect_to text default null,
     locked boolean default false not null,
+    document_root text,
     CONSTRAINT valid_redirect CHECK (
         (
             redirect_to IS NULL
@@ -26,7 +27,8 @@ CREATE TABLE services.t_vhosts
             redirect_to IS NULL
             AND is_redirect
         )),
-    CONSTRAINT valid_name CHECK (name ~* '^[a-z0-9\.\-\^*]*$')
+    CONSTRAINT valid_name CHECK (name ~* '^[a-z0-9\.\-\^*]*$'),
+    CONSTRAINT valid_document_root CHECK (document_root IS NULL OR document_root ~* '^\/[a-z0-9\.\/\-\^*]+$' )
 );
 
 ALTER TABLE services.t_vhosts add unique(t_domains_id, name);

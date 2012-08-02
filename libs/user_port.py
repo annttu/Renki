@@ -26,12 +26,12 @@ class User_ports(object):
         self.main = main
         self.log = logging.getLogger('services.user_ports')
         self.database_loaded = False
-        if not self.main.dynamic_load:
+        if not self.main.dynamic_load and not self.main.loaded:
             self._load_database()
 
     def _load_database(self):
         """Load database when needed"""
-        if self.database_loaded:
+        if self.database_loaded or (self.main.loaded and not self.main.dynamic_load):
             return True
         user_ports = Table('user_ports', self.main.metadata,
             Column('t_user_ports_id', Integer, primary_key=True),

@@ -27,7 +27,7 @@ class Hosts(object):
         self.log = logging.getLogger('services.hosts')
         self.main.require_admin()
         self.database_loaded = False
-        if not self.main.dynamic_load:
+        if not self.main.dynamic_load and not self.main.loaded:
             self._load_database()
 
     def _load_database(self):
