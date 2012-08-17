@@ -765,14 +765,22 @@ END;
 $$
 LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION public.select_vhost_server(vhost text)
+
+
+CREATE OR REPLACE FUNCTION public.select_vhost_server(vhost text, services_id integer)
 RETURNS INTEGER
 AS
 $$
 DECLARE
     domain text;
+    serv integer;
 BEGIN
     domain := find_domain(vhost);
+    IF (services_id IS NOT NULL) THEN
+        FOR serv IN SELECT vhost_servers.t_services_id from vhost_servers WHERE t_services_id = services_id LOOP
+            RETURN serv;
+        END LOOP;
+    END IF;
     IF (domain = 'kapsi.fi') THEN
         RETURN t_services_id FROM vhost_servers WHERE server = 'vhost-ssl.kapsi.fi';
     ELSE

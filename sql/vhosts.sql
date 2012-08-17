@@ -142,7 +142,7 @@ find_domain(NEW.name),
 NEW.redirect_to,
 (public.is_admin() AND NEW.logaccess),
 (public.is_admin() AND NEW.locked),
-select_vhost_server(NEW.name)
+select_vhost_server(NEW.name, NEW.t_services_id)
 FROM users
 JOIN t_customers USING (t_customers_id)
 WHERE (
@@ -169,11 +169,12 @@ RETURNING t_vhosts_id, (SELECT users.t_customers_id FROM users WHERE users.t_use
     t_vhosts.created, (SELECT vhostdomaincat(t_vhosts.name, domains.name) FROM domains WHERE domains.t_domains_id = t_vhosts.t_domains_id),
     ARRAY[]::text[], ARRAY[]::text[], t_vhosts.redirect_to, t_vhosts.logaccess,t_vhosts.locked,t_vhosts.t_domains_id,t_vhosts.t_services_id;
 -- add aliases also
-INSERT INTO t_vhosts (t_users_id, t_domains_id, name, parent_id)
+INSERT INTO t_vhosts (t_users_id, t_domains_id, name, parent_id, t_services_id)
 SELECT users.t_users_id,
 find_domain(unnest(new.aliases)) as domain,
 find_vhost(unnest(new.aliases)) as name,
-vhosts.t_vhosts_id
+vhosts.t_vhosts_id,
+select_vhost_server(NEW.name, NEW.t_services_id)
 FROM users
 JOIN t_customers USING (t_customers_id)
 JOIN vhosts USING (t_users_id)
@@ -190,12 +191,14 @@ WHERE (
 )
 AND vhosts.name = NEW.name
 ;
-INSERT INTO t_vhosts (t_users_id, t_domains_id, name, parent_id, is_redirect)
+INSERT INTO t_vhosts (t_users_id, t_domains_id, name, parent_id, is_redirect,
+t_services_id)
 SELECT users.t_users_id,
 find_domain(unnest(new.redirects)) as domain,
 find_vhost(unnest(new.redirects)) as name,
 vhosts.t_vhosts_id,
-true
+true,
+select_vhost_server(NEW.name, NEW.t_services_id)
 FROM users
 JOIN t_customers USING (t_customers_id)
 JOIN vhosts USING (t_users_id)

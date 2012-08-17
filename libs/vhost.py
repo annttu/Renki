@@ -8,7 +8,7 @@ from services.exceptions import *
 import logging
 from sqlalchemy.exc import IntegrityError, OperationalError, InternalError
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
-from sqlalchemy import MetaData, Table, Column, Integer, ForeignKey
+from sqlalchemy import MetaData, Table, Column, Integer, ForeignKey, String
 from sqlalchemy.orm import mapper, relationship
 
 # TODO
@@ -54,6 +54,12 @@ class Vhosts(object):
         mapper(self.main.Vhost_redirects, vhost_redirects, properties={
             'vhost': relationship(self.main.Vhosts, backref='vhost_redirects')
         })
+        vhost_servers = Table('vhost_servers', self.main.metadata,
+            Column("t_services_id", Integer, primary_key=True),
+            Column("server", String),
+            Column("info", String),
+            autoload=False)
+        mapper(self.main.Vhost_servers, vhost_servers)
         self.database_loaded = True
         return True
 
@@ -64,7 +70,8 @@ class Vhosts(object):
                 return False
         return True
 
-    def add(self,name,redirects=[], aliases=[], redirect_to=None, username=None):
+    def add(self,name,redirects=[], aliases=[], redirect_to=None, username=None,
+            t_services_id = None, server = None):
         """Function to create vhost object
         name = vhost name (mandatory)
         aliases = vhost aliases
@@ -130,12 +137,18 @@ class Vhosts(object):
             if not self.main.username or self.main.username == '':
                 raise RuntimeError('Select username first!')
             username = self.main.username
+        if server:
+            try:
+                t_services_id = self.get_server(server).t_services_id
+            except DoesNotExist as e:
+                raise RuntimeError(e)
         vhost = self.main.Vhosts()
         vhost.username = username
         vhost.aliases = aliases
         vhost.redirects = redirects
         vhost.name = name
         vhost.redirect_to = redirect_to
+        vhost.t_services_id = t_services_id
         self.main.session.add(vhost)
         try:
             self.main.session.commit()
@@ -266,6 +279,16 @@ class Vhosts(object):
             retval = vhosts.all()
             self.main.session.commit()
             return retval
+
+    def get_server(self, server):
+        """Get vhost_server object by name"""
+        try:
+            return self.main.session.query(self.main.Vhost_servers
+                    ).filter(self.main.Vhost_servers.server == server).one()
+        except NoResultFound:
+            self.main.session.rollback()
+            raise DoesNotExist('Vhost server %s does not exist' % server)
+        return
 
     def add_logaccess(self, addr):
         """Enable vhost logaccess"""

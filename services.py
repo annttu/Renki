@@ -22,7 +22,7 @@ from libs.user_port import User_ports
 from libs.host import Hosts
 from libs.subnet import Subnets
 from exceptions import DatabaseError, DoesNotExist, PermissionDenied
-from types import INETARRAY
+from libs.types import INETARRAY
 
 logging.basicConfig()
 logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
@@ -338,7 +338,7 @@ class Services(object):
                                                 username, self.customer_id))
         except Exception as e:
             msg = 'Cannot create user %s to customer %s' % (
-                                                username, self.customer_id))
+                                                username, self.customer_id)
             self.log.error(msg)
             self.log.exception(e)
             raise RuntimeError(msg)
@@ -411,6 +411,9 @@ class Services(object):
         """Vhost redirect object
         object is mapped to the vhost_redirects view"""
 
+    class Vhost_servers(object):
+        """Vhost servers object
+        object is mapped to the vhost_servers view"""
 
     class Mailboxes(object):
         """Mailboxes object
