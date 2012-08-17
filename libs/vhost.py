@@ -64,7 +64,7 @@ class Vhosts(object):
                 return False
         return True
 
-    def add(self,name,redirects=[], aliases=[], redirect_to=None):
+    def add(self,name,redirects=[], aliases=[], redirect_to=None, username=None):
         """Function to create vhost object
         name = vhost name (mandatory)
         aliases = vhost aliases
@@ -126,10 +126,12 @@ class Vhosts(object):
                 raise RuntimeError('Redirect %s already exist' % name)
             except DoesNotExist:
                 pass
-        if not self.main.username or self.main.username == '':
-            raise RuntimeError('Select username first!')
+        if not username:
+            if not self.main.username or self.main.username == '':
+                raise RuntimeError('Select username first!')
+            username = self.main.username
         vhost = self.main.Vhosts()
-        vhost.username = self.main.username
+        vhost.username = username
         vhost.aliases = aliases
         vhost.redirects = redirects
         vhost.name = name
@@ -145,6 +147,11 @@ class Vhosts(object):
             self.main.session.rollback()
             self.log.exception(e)
             raise RuntimeError(e)
+        except TypeError:
+            # maybe sqlalchemy bug, if insert don't return anything, 
+            # it causes TypeError
+            self.main.session.rollback()
+            raise RuntimeError('Insert didn\'t return anyting')
         return vhost.t_vhosts_id
 
 

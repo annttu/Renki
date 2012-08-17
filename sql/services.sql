@@ -40,8 +40,8 @@ insert into t_service_types (service_category, service_type) VALUES ('VHOST','WO
 insert into t_service_types (service_category, service_type) VALUES ('SHELL','USER_PORT');
 insert into t_service_types (service_category, service_type) VALUES ('SHELL','SHELL');
 insert into t_service_types (service_category, service_type) VALUES ('OTHER','JABBER');
-    
-    
+
+
 ----------------
 -- User ports --
 ----------------
