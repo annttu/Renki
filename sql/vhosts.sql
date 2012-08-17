@@ -8,7 +8,7 @@ CREATE TABLE services.t_vhosts
     t_vhosts_id serial not null PRIMARY KEY,
     t_users_id integer REFERENCES t_users NOT NULL,
     parent_id integer REFERENCES t_vhosts,
-    www_servers_id integer REFERENCES t_hosts,
+    t_services_id integer REFERENCES t_services,
     name text not null,
     created timestamptz default now(),
     t_domains_id integer not null REFERENCES t_domains,
@@ -35,6 +35,26 @@ ALTER TABLE services.t_vhosts add unique(t_domains_id, name);
 
 SELECT create_log_triggers('services.t_vhosts'::text);
 
+DROP TRIGGER t_vhosts_delete_update_dns ON t_vhosts;
+DROP TRIGGER t_vhosts_insert_update_dns ON t_vhosts;
+DROP TRIGGER t_vhosts_update_update_dns ON t_vhosts;
+
+CREATE TRIGGER t_vhosts_insert_update_dns
+AFTER INSERT ON t_vhosts
+FOR EACH ROW
+EXECUTE PROCEDURE add_vhost_dns_entries();
+
+CREATE TRIGGER t_vhosts_delete_update_dns
+AFTER DELETE ON t_vhosts
+FOR EACH ROW
+EXECUTE PROCEDURE add_vhost_dns_entries();
+
+CREATE TRIGGER t_vhosts_update_update_dns
+AFTER UPDATE ON t_vhosts
+FOR EACH ROW
+WHEN (OLD.* IS DISTINCT FROM NEW.*)
+EXECUTE PROCEDURE add_vhost_dns_entries();
+
 CREATE OR REPLACE VIEW public.vhosts
 AS
 SELECT t_vhosts.t_vhosts_id, t_customers.t_customers_id, t_users.name as username, t_vhosts.t_users_id, t_vhosts.created,
@@ -44,7 +64,8 @@ array_agg(distinct vhostdomaincat(t_vhost_redirects.name::text,t_redirects_domai
 t_vhosts.redirect_to,
 t_vhosts.logaccess,
 t_vhosts.locked,
-t_dom.t_domains_id
+t_dom.t_domains_id,
+t_vhosts.t_services_id
 FROM t_vhosts
 JOIN t_domains as t_dom ON (t_vhosts.t_domains_id = t_dom.t_domains_id)
 JOIN t_users ON (t_users.t_users_id = t_vhosts.t_users_id)
@@ -104,18 +125,24 @@ OR t_vhosts.redirect_to IS NOT NULL);
 
 GRANT SELECT ON public.vhost_redirects TO users;
 
+-- On insert to public.vhosts view do:
+-- insert vhost to t_vhosts table
+-- insert aliases to t_vhosts table
+-- insert redirects to t_vhosts table
+
 CREATE OR REPLACE RULE vhosts_insert
 AS ON INSERT TO public.vhosts
 DO INSTEAD
 (
 INSERT INTO t_vhosts
-(t_users_id, name, t_domains_id, redirect_to,logaccess,locked)
+(t_users_id, name, t_domains_id, redirect_to,logaccess,locked, t_services_id)
 SELECT users.t_users_id,
 find_vhost(NEW.name),
 find_domain(NEW.name),
 NEW.redirect_to,
 (public.is_admin() AND NEW.logaccess),
-(public.is_admin() AND NEW.locked)
+(public.is_admin() AND NEW.locked),
+select_vhost_server(NEW.name)
 FROM users
 JOIN t_customers USING (t_customers_id)
 WHERE (
@@ -140,7 +167,7 @@ AND (
 RETURNING t_vhosts_id, (SELECT users.t_customers_id FROM users WHERE users.t_users_id = t_vhosts.t_users_id) AS t_customers_id,
 (SELECT users.name from users WHERE users.t_users_id = t_vhosts.t_users_id), t_vhosts.t_users_id,
     t_vhosts.created, (SELECT vhostdomaincat(t_vhosts.name, domains.name) FROM domains WHERE domains.t_domains_id = t_vhosts.t_domains_id),
-    ARRAY[]::text[], ARRAY[]::text[], t_vhosts.redirect_to, t_vhosts.logaccess,t_vhosts.locked,t_vhosts.t_domains_id;
+    ARRAY[]::text[], ARRAY[]::text[], t_vhosts.redirect_to, t_vhosts.logaccess,t_vhosts.locked,t_vhosts.t_domains_id,t_vhosts.t_services_id;
 -- add aliases also
 INSERT INTO t_vhosts (t_users_id, t_domains_id, name, parent_id)
 SELECT users.t_users_id,
@@ -190,6 +217,11 @@ AND vhosts.name = NEW.name
 GRANT INSERT ON public.vhosts TO users;
 GRANT USAGE ON t_vhosts_t_vhosts_id_seq TO users;
 
+
+-- On update to vhosts view do:
+-- Update aliases on t_vhosts table
+-- update redirects on t_vhosts table
+
 CREATE OR REPLACE RULE vhosts_update
 AS ON UPDATE TO vhosts
 DO INSTEAD
@@ -206,7 +238,7 @@ AND ((users.name = CURRENT_USER  AND NOT public.is_admin()) OR (public.is_admin(
 RETURNING t_vhosts_id, (SELECT users.t_customers_id FROM users WHERE users.t_users_id = t_vhosts.t_users_id) AS t_customers_id,
 (SELECT users.name from users WHERE users.t_users_id = t_vhosts.t_users_id), t_vhosts.t_users_id,
     t_vhosts.created, (SELECT vhostdomaincat(t_vhosts.name, domains.name) FROM domains WHERE domains.t_domains_id = t_vhosts.t_domains_id),
-    ARRAY[]::text[], ARRAY[]::text[], t_vhosts.redirect_to, t_vhosts.logaccess,t_vhosts.locked,t_vhosts.t_domains_id;
+    ARRAY[]::text[], ARRAY[]::text[], t_vhosts.redirect_to, t_vhosts.logaccess,t_vhosts.locked,t_vhosts.t_domains_id,t_vhosts.t_services_id;
 -- delete removed alias row from t_vhost_aliases table
 DELETE FROM t_vhosts
 WHERE parent_id = old.t_vhosts_id
@@ -227,23 +259,30 @@ AND (
         )
     )
 );
-INSERT INTO t_vhosts (t_users_id, parent_id, name, t_domains_id, is_redirect)
+INSERT INTO t_vhosts (t_users_id, parent_id, name, t_domains_id, is_redirect, t_services_id)
 SELECT users.t_users_id,  old.t_vhosts_id,
 find_vhost(compare_arrays(new.aliases::text[], old.aliases::text[])) as name,
 find_domain(compare_arrays(new.aliases::text[], old.aliases::text[])) as t_domains_id,
-false
+false,
+old.t_services_id
 FROM users
 WHERE ((users.name = CURRENT_USER  AND NOT public.is_admin()) OR (public.is_admin() AND users.t_users_id = OLD.t_users_id));
-INSERT INTO t_vhosts (t_users_id, parent_id, name, t_domains_id, is_redirect)
+INSERT INTO t_vhosts (t_users_id, parent_id, name, t_domains_id, is_redirect, t_services_id)
 SELECT users.t_users_id,  old.t_vhosts_id,
 find_vhost(compare_arrays(new.redirects::text[], old.redirects::text[])) as name,
 find_domain(compare_arrays(new.redirects::text[], old.redirects::text[])) as t_domains_id,
-true
+true,
+old.t_services_id
 FROM users
 WHERE ((users.name = CURRENT_USER  AND NOT public.is_admin()) OR (public.is_admin() AND users.t_users_id = OLD.t_users_id));
 );
 
 GRANT UPDATE ON public.vhosts TO users;
+
+-- On delete to vhosts delete do
+-- delete aliases,
+-- delete redirects and,
+-- delete vhost entries
 
 CREATE OR REPLACE RULE vhosts_delete
 AS ON DELETE TO vhosts
@@ -266,3 +305,23 @@ AND (t_users.name = CURRENT_USER OR public.is_admin())
 );
 
 GRANT DELETE ON public.vhosts TO users;
+
+-- Vhost servers view
+
+CREATE OR REPLACE VIEW public.vhost_servers
+AS
+SELECT t_services.t_services_id,
+t_addresses.name || '.' || t_domains.name as server,
+t_services.info as info
+FROM t_services
+JOIN t_addresses ON t_services.t_addresses_id = t_addresses.t_addresses_id
+JOIN t_domains ON (t_services.t_domains_id = t_domains.t_domains_id)
+JOIN users ON users.name = CURRENT_USER
+JOIN t_customers ON (t_customers.t_customers_id = users.t_customers_id)
+WHERE t_services.service_type = 'VHOST'
+AND t_services.public = TRUE
+AND t_services.active = TRUE
+AND ( t_services.t_domains_id = users.t_domains_id OR public.is_admin());
+
+GRANT SELECT ON public.vhost_servers TO users;
+GRANT SELECT ON public.vhost_servers TO admins;

@@ -121,7 +121,7 @@ SELECT create_log_triggers('services.t_dns_keys'::text);
 
 CREATE TABLE services.t_users (
     t_users_id serial NOT NULL PRIMARY KEY,
-    t_customers_id integer NOT NULL,
+    t_customers_id integer NOT NULL REFERENCES t_customers,
     created timestamp with time zone DEFAULT now() NOT NULL,
     name text NOT NULL UNIQUE,
     lastname text,
@@ -250,3 +250,19 @@ GRANT SELECT,INSERT,UPDATE,DELETE ON domains TO users;
 GRANT SELECT,INSERT,UPDATE,DELETE ON domains TO admins;
 GRANT USAGE ON services.t_domains_t_domains_id_seq TO users;
 GRANT USAGE ON services.t_domains_t_domains_id_seq TO admins;
+
+
+-- DNS-entries table
+
+CREATE TABLE services.t_dns_entries
+(
+    t_dns_entries_id serial PRIMARY KEY NOT NULL,
+    ttl INTEGER NOT NULL DEFAULT 3600,
+    type t_dns_entries_type NOT NULL,
+    key text NOT NULL,
+    value text NOT NULL,
+    manual boolean NOT NULL default FALSE,
+    t_domains_id integer references services.t_domains
+);
+
+SELECT create_log_triggers('services.t_dns_entries'::text);

@@ -316,11 +316,32 @@ class Services(object):
     def get_username(self):
         """Get username by t_customers_id"""
         if not self.customer_id:
-            raise RuntimeError('Select user first')
+            raise RuntimeError('Select customer first')
         try:
             query = self.session.query(self.Users.name).filter(self.Users.t_customers_id == self.customer_id).one()
         except NoResultFound:
             raise DoesNotExist('User for customer_id %s does not found' % self.customer_id)
+
+    def add_user(self, username, first_names=None, last_name=None, uid=None):
+        if not self.customer_id:
+            raise RuntimeError('Select customer first')
+        try:
+            user = self.User
+            user.name = username
+            user.firstname = firstnames
+            user.lastname = last_name
+            user.unix_id = uid
+            user.t_customers_id = self.customer_id
+            self.session.add(user)
+            self.session.commit()
+            self.log.info('Added user %s to customer %s' % (
+                                                username, self.customer_id))
+        except Exception as e:
+            msg = 'Cannot create user %s to customer %s' % (
+                                                username, self.customer_id))
+            self.log.error(msg)
+            self.log.exception(e)
+            raise RuntimeError(msg)
 
     def require_alias(self,alias):
         """Check if there is alias row for <alias>"""

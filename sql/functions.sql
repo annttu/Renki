@@ -148,7 +148,6 @@ CREATE OR REPLACE FUNCTION public.find_domain(domain text) RETURNS integer AS $$
     ELSE
       customer_id := users.t_customers_id FROM users WHERE users.name = CURRENT_USER;
       domainpart = regexp_replace(domain,'\*','\\*');
-      RAISE NOTICE 'domainpart %', domainpart;
       partarray = regexp_split_to_array(domain, '\.');
       FOREACH m IN ARRAY partarray
       LOOP
@@ -174,10 +173,7 @@ CREATE OR REPLACE FUNCTION public.find_domain(domain text) RETURNS integer AS $$
             END IF;
         END LOOP;
         m := regexp_replace(m,'\*','\\\\\*');
-        RAISE NOTICE 'm %', m;
         domainpart = regexp_replace(domainpart, '^' || m || '\.', '');
-        RAISE NOTICE 'domainpart %', domainpart;
-
     END LOOP;
     END IF;
     RAISE EXCEPTION 'Domain for vhost % not found', domain;
@@ -662,8 +658,17 @@ DECLARE
 BEGIN
     FOR alias IN SELECT customers.t_customers_id
                 FROM users JOIN customers USING (t_customers_id)
-                WHERE users.name = CURRENT_USER::text
+                WHERE (users.name = CURRENT_USER::text OR public.is_admin())
                 AND aliasname = ANY(customers.aliases)
+        LOOP
+        IF alias IS NOT NULL THEN
+            RETURN TRUE;
+        END IF;
+    END LOOP;
+    FOR alias IN SELECT customers.t_customers_id
+                FROM users JOIN customers USING (t_customers_id)
+                WHERE (users.name = CURRENT_USER::text OR public.is_admin())
+                AND aliasname = users.name
         LOOP
         IF alias IS NOT NULL THEN
             RETURN TRUE;
@@ -712,3 +717,67 @@ $f$ LANGUAGE plpgsql;
 
 GRANT EXECUTE ON FUNCTION public.valid_database_name(text) TO users;
 GRANT EXECUTE ON FUNCTION public.valid_database_name(text) TO admins;
+
+CREATE OR REPLACE FUNCTION add_vhost_dns_entries()
+RETURNS TRIGGER
+AS
+$$
+DECLARE
+    ip4 text;
+    ip6 text;
+BEGIN
+    IF (TG_OP = 'INSERT') THEN
+        ip4 := t_addresses.ip_address::text FROM t_services JOIN t_addresses USING (t_addresses_id) WHERE t_services.t_services_id = NEW.t_services_id;
+        ip6 := t_addresses.ip6_address::text FROM t_services JOIN t_addresses USING (t_addresses_id) WHERE t_services.t_services_id = NEW.t_services_id;
+        EXECUTE 'INSERT INTO services.t_dns_entries
+        (type, key, value, t_domains_id)
+        VALUES ($t$A$t$, $t$' || NEW.name || '$t$, $t$' || ip4 || '$t$,$t$' || NEW.t_domains_id || '$t$)';
+        IF (ip6 IS NOT NULL) THEN
+            EXECUTE 'INSERT INTO t_dns_entries
+            (type, key, value, t_domains_id)
+            VALUES ($t$AAAA$t$, $t$' || NEW.name || '$t$, $t$' || ip6 || '$t$,$t$' || NEW.t_domains_id || '$t$)';
+        END IF;
+        RETURN NEW;
+    ELSIF (TG_OP = 'UPDATE') THEN
+        ip4 := t_addresses.ip_address::text FROM t_services JOIN t_addresses USING (t_addresses_id) WHERE t_services.t_services_id = NEW.t_services_id;
+        ip6 := t_addresses.ip6_address::text FROM t_services JOIN t_addresses USING (t_addresses_id) WHERE t_services.t_services_id = NEW.t_services_id;
+        EXECUTE 'DELETE FROM services.t_dns_entries
+        WHERE t_domains_id = $t$' || OLD.t_domains_id || '$t$
+        AND key = $t$' || OLD.name || '$t$
+        AND ( TYPE = $t$A$t$ OR type = $t$AAAA$t$ )';
+        EXECUTE 'INSERT INTO services.t_dns_entries
+        (type, key, value, t_domains_id)
+        VALUES ($t$A$t$, $t$' || NEW.name || '$t$, $t$' || ip4 || '$t$,$t$' || NEW.t_domains_id || '$t$)';
+        IF (ip6 IS NOT NULL) THEN
+            EXECUTE 'INSERT INTO t_dns_entries
+            (type, key, value, t_domains_id)
+            VALUES ($t$AAAA$t$, $t$' || NEW.name || '$t$, $t$' || ip6 || '$t$,$t$' || NEW.t_domains_id || '$t$)';
+        END IF;
+        RETURN NEW;
+    ELSIF (TG_OP = 'DELETE') THEN
+        EXECUTE 'DELETE FROM services.t_dns_entries
+        WHERE t_domains_id = $t$' || OLD.t_domains_id || '$t$
+        AND key = $t$' || OLD.name || '$t$
+        AND ( TYPE = $t$A$t$ OR type = $t$AAAA$t$ )';
+        RETURN OLD;
+    END IF;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION public.select_vhost_server(vhost text)
+RETURNS INTEGER
+AS
+$$
+DECLARE
+    domain text;
+BEGIN
+    domain := find_domain(vhost);
+    IF (domain = 'kapsi.fi') THEN
+        RETURN t_services_id FROM vhost_servers WHERE server = 'vhost-ssl.kapsi.fi';
+    ELSE
+        RETURN t_services_id FROM vhost_servers WHERE server = 'vhost.kapsi.fi';
+    END IF;
+END;
+$$
+language plpgsql;

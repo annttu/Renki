@@ -129,7 +129,7 @@ SECURITY DEFINER;
 
 DROP TRIGGER IF EXISTS t_users_update_backup_s_vhosts ON t_users;
 CREATE TRIGGER t_users_update_backup_s_vhosts
-BEFORE UPDATE OR DELETE
+BEFORE UPDATE
 ON t_users
 FOR EACH ROW
 EXECUTE PROCEDURE t_users_backup_s_vhosts_trigger();
