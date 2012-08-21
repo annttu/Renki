@@ -1,3 +1,4 @@
+
 -- public.is_admin (text) function
 -- username given as argument
 -- check if username is in admins postgresql user group
@@ -19,9 +20,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- do users really need this??
--- GRANT EXECUTE ON FUNCTION public.is_admin() TO users;
-GRANT EXECUTE ON FUNCTION public.is_admin() TO admins;
-GRANT EXECUTE ON FUNCTION public.is_admin() TO servers;
+GRANT EXECUTE ON FUNCTION public.is_admin(text) TO users;
+GRANT EXECUTE ON FUNCTION public.is_admin(text) TO admins;
+GRANT EXECUTE ON FUNCTION public.is_admin(text) TO servers;
 
 
 -- public.is_admin () function
@@ -364,7 +365,7 @@ BEGIN
         LOOP
         FOR port IN SELECT (t_user_ports.port + 1) AS port
                     FROM services.t_user_ports
-                    LEFT JOIN t_user_ports AS t_port ON ( t_user_ports.port + 1 ) = t_port.port
+                    LEFT JOIN services.t_user_ports AS t_port ON ( t_user_ports.port + 1 ) = t_port.port
                     WHERE t_port.port IS NULL AND t_user_ports.t_services_id = services_id LIMIT 1
             LOOP
                 IF port > lower_limit AND port < upper_limit THEN
@@ -580,18 +581,18 @@ BEGIN
     EXECUTE 'CREATE TRIGGER ' || tablename::text || '_log_insert
             AFTER INSERT ON ' || tablen::text || '
             FOR EACH ROW
-            EXECUTE PROCEDURE log_trigger($$' || pk::text || '$$)';
+            EXECUTE PROCEDURE services.log_trigger($$' || pk::text || '$$)';
     EXECUTE 'DROP TRIGGER IF EXISTS ' || tablename::text || '_log_update ON ' || tablen::text;
     EXECUTE 'CREATE TRIGGER ' || tablename::text || '_log_update
             AFTER UPDATE ON ' || tablen::text || '
             FOR EACH ROW
             WHEN (OLD.* IS DISTINCT FROM NEW.*)
-            EXECUTE PROCEDURE log_trigger($$' || pk::text || '$$)';
+            EXECUTE PROCEDURE services.log_trigger($$' || pk::text || '$$)';
     EXECUTE 'DROP TRIGGER IF EXISTS ' || tablename::text || '_log_delete ON ' || tablen::text;
     EXECUTE 'CREATE TRIGGER ' || tablename::text || '_log_delete
             BEFORE DELETE ON ' || tablen::text || '
             FOR EACH ROW
-            EXECUTE PROCEDURE log_trigger($$' || pk::text || '$$)';
+            EXECUTE PROCEDURE services.log_trigger($$' || pk::text || '$$)';
 END;
 $f$ LANGUAGE plpgsql;
 
@@ -606,19 +607,19 @@ DECLARE
 BEGIN
     IF (TG_OP = 'INSERT') THEN
         EXECUTE 'SELECT ($1).' || TG_ARGV[0] || '::text' INTO t USING NEW;
-        EXECUTE 'INSERT INTO t_change_log
+        EXECUTE 'INSERT INTO services.t_change_log
                 (table_ref, data_id, event_type, username)
                 VALUES ($$' || TG_TABLE_NAME || '$$::regclass::oid, $$' || t || '$$, $$' || TG_OP || '$$, $$' || session_user || '$$)';
         RETURN NEW;
     ELSIF (TG_OP = 'UPDATE') THEN
         EXECUTE 'SELECT ($1).' || TG_ARGV[0] || '::text' INTO t USING NEW;
-        EXECUTE 'INSERT INTO t_change_log
+        EXECUTE 'INSERT INTO services.t_change_log
                 (table_ref, data_id, event_type, username)
                 VALUES ($$' || TG_TABLE_NAME || '$$::regclass::oid, $$' || t || '$$ , $$' || TG_OP || '$$, $$' || session_user || '$$)';
         RETURN NEW;
     ELSIF (TG_OP = 'DELETE') THEN
         EXECUTE 'SELECT ($1).' || TG_ARGV[0] || '::text' INTO t USING OLD;
-        EXECUTE 'INSERT INTO t_change_log
+        EXECUTE 'INSERT INTO services.t_change_log
                 (table_ref, data_id, event_type, username)
                 VALUES ($$' || TG_TABLE_NAME || '$$::regclass::oid, $$' || t || '$$, $$' || TG_OP || '$$, $$' || session_user || '$$)';
         RETURN OLD;
@@ -638,7 +639,7 @@ AS $f$
 DECLARE
     isin boolean;
 BEGIN
-    isin := (t_subnets.address >> ip::inet) FROM t_subnets WHERE t_subnets.t_subnets_id = subnet_id;
+    isin := (t_subnets.address >> ip::inet) FROM services.t_subnets WHERE t_subnets.t_subnets_id = subnet_id;
     IF isin IS true OR isin IS false THEN
         RETURN isin;
     END IF;
@@ -727,8 +728,8 @@ DECLARE
     ip6 text;
 BEGIN
     IF (TG_OP = 'INSERT') THEN
-        ip4 := t_addresses.ip_address::text FROM t_services JOIN t_addresses USING (t_addresses_id) WHERE t_services.t_services_id = NEW.t_services_id;
-        ip6 := t_addresses.ip6_address::text FROM t_services JOIN t_addresses USING (t_addresses_id) WHERE t_services.t_services_id = NEW.t_services_id;
+        ip4 := services.t_addresses.ip_address::text FROM services.t_services JOIN services.t_addresses USING (t_addresses_id) WHERE t_services.t_services_id = NEW.t_services_id;
+        ip6 := services.t_addresses.ip6_address::text FROM services.t_services JOIN services.t_addresses USING (t_addresses_id) WHERE t_services.t_services_id = NEW.t_services_id;
         EXECUTE 'INSERT INTO services.t_dns_entries
         (type, key, value, t_domains_id)
         VALUES ($t$A$t$, $t$' || NEW.name || '$t$, $t$' || ip4 || '$t$,$t$' || NEW.t_domains_id || '$t$)';
@@ -739,8 +740,14 @@ BEGIN
         END IF;
         RETURN NEW;
     ELSIF (TG_OP = 'UPDATE') THEN
-        ip4 := t_addresses.ip_address::text FROM t_services JOIN t_addresses USING (t_addresses_id) WHERE t_services.t_services_id = NEW.t_services_id;
-        ip6 := t_addresses.ip6_address::text FROM t_services JOIN t_addresses USING (t_addresses_id) WHERE t_services.t_services_id = NEW.t_services_id;
+        ip4 := services.t_addresses.ip_address::text 
+                FROM services.t_services 
+                JOIN services.t_addresses USING (t_addresses_id) 
+                WHERE t_services.t_services_id = NEW.t_services_id;
+        ip6 := services.t_addresses.ip6_address::text
+                FROM services.t_services
+                JOIN services.t_addresses USING (t_addresses_id)
+                WHERE services.t_services.t_services_id = NEW.t_services_id;
         EXECUTE 'DELETE FROM services.t_dns_entries
         WHERE t_domains_id = $t$' || OLD.t_domains_id || '$t$
         AND key = $t$' || OLD.name || '$t$

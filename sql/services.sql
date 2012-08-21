@@ -71,11 +71,11 @@ SELECT
 t_services.t_services_id as t_services_id,
 public.find_free_port(t_services.t_services_id) as port,
 t_addresses.name || '.' || t_domains.name as server
-FROM t_services
-JOIN t_addresses ON t_services.t_addresses_id = t_addresses.t_addresses_id
-JOIN t_domains ON (t_services.t_domains_id = t_domains.t_domains_id)
+FROM services.t_services
+JOIN services.t_addresses ON t_services.t_addresses_id = t_addresses.t_addresses_id
+JOIN services.t_domains ON (t_services.t_domains_id = t_domains.t_domains_id)
 JOIN users ON users.name = CURRENT_USER
-JOIN t_customers ON (t_customers.t_customers_id = users.t_customers_id)
+JOIN services.t_customers ON (t_customers.t_customers_id = users.t_customers_id)
 WHERE t_services.service_type = 'USER_PORT'
 AND t_services.public = TRUE
 AND t_services.active = TRUE
@@ -96,11 +96,11 @@ t_addresses.name || '.' || t_domains.name as server,
 t_user_ports.info as info,
 t_user_ports.approved,
 t_user_ports.active
-FROM t_user_ports
-JOIN t_users USING (t_users_id)
-JOIN t_services USING (t_services_id)
-JOIN t_addresses ON t_addresses.t_addresses_id = t_services.t_addresses_id
-JOIN t_domains ON t_addresses.t_domains_id = t_domains.t_domains_id
+FROM services.t_user_ports
+JOIN services.t_users USING (t_users_id)
+JOIN services.t_services USING (t_services_id)
+JOIN services.t_addresses ON t_addresses.t_addresses_id = t_services.t_addresses_id
+JOIN services.t_domains ON t_addresses.t_domains_id = t_domains.t_domains_id
 WHERE ( t_users.name = CURRENT_USER OR public.is_admin())
 AND t_user_ports.t_users_id = t_users.t_users_id;
 
@@ -154,7 +154,7 @@ UPDATE t_user_ports SET
 active = NEW.active,
 info = NEW.info,
 approved = ((public.is_admin() AND NEW.approved ) OR (OLD.approved))
-FROM t_customers, users
+FROM services.t_customers, users
 WHERE t_user_ports.t_user_ports_id = new.t_user_ports_id
 AND t_user_ports.t_users_id = users.t_users_id
 AND t_customers.t_customers_id = users.t_customers_id
@@ -173,7 +173,7 @@ AS ON DELETE
 TO public.user_ports
 DO INSTEAD
 (
-DELETE FROM t_user_ports USING t_customers, t_users
+DELETE FROM services.t_user_ports USING services.t_customers, services.t_users
 WHERE t_user_ports.t_user_ports_id = OLD.t_user_ports_id
 AND t_user_ports.t_users_id = t_users.t_users_id
 AND t_users.t_customers_id = t_customers.t_customers_id
@@ -221,12 +221,12 @@ CREATE OR REPLACE VIEW public.database_servers
 AS
 SELECT t_services_id, t_addresses.name || '.' || t_domains.name as server,
 t_services.service_type AS database_type, t_services.active
-FROM t_services
-JOIN t_addresses USING (t_addresses_id)
-JOIN t_hosts USING (t_hosts_id)
-JOIN t_domains ON t_services.t_domains_id = t_domains.t_domains_id
-JOIN t_users ON CURRENT_USER = t_users.name
-JOIN t_service_types USING (service_type)
+FROM services.t_services
+JOIN services.t_addresses USING (t_addresses_id)
+JOIN services.t_hosts USING (t_hosts_id)
+JOIN services.t_domains ON t_services.t_domains_id = t_domains.t_domains_id
+JOIN services.t_users ON CURRENT_USER = t_users.name
+JOIN services.t_service_types USING (service_type)
 WHERE t_service_types.service_category = 'DATABASE'
 AND t_services.public = True
 AND (t_users.t_domains_id = t_services.t_domains_id OR public.is_admin() = True);
@@ -242,12 +242,12 @@ AS
 SELECT DISTINCT t_databases.t_databases_id, t_databases.database_name, t_databases.username, t_databases.t_customers_id,
 t_databases.approved, t_services.service_type AS database_type,
 t_addresses.name || '.' || t_domains.name AS server, t_databases.info
-FROM t_databases
-JOIN t_customers ON t_databases.t_customers_id = t_customers.t_customers_id
-JOIN t_users ON t_users.t_customers_id = t_customers.t_customers_id
-JOIN t_services USING (t_services_id)
-JOIN t_addresses USING (t_addresses_id)
-JOIN t_domains ON t_addresses.t_domains_id = t_domains.t_domains_id
+FROM services.t_databases
+JOIN services.t_customers ON t_databases.t_customers_id = t_customers.t_customers_id
+JOIN services.t_users ON t_users.t_customers_id = t_customers.t_customers_id
+JOIN services.t_services USING (t_services_id)
+JOIN services.t_addresses USING (t_addresses_id)
+JOIN services.t_domains ON t_addresses.t_domains_id = t_domains.t_domains_id
 WHERE (t_users.name = CURRENT_USER OR public.is_admin() = true)
 ;
 
@@ -273,7 +273,7 @@ INSERT INTO services.t_databases
             ) < 10
         )
     )
-    FROM t_customers
+    FROM services.t_customers
     JOIN database_servers ON (database_servers.active = True)
     JOIN users ON (t_customers.t_customers_id = users.t_customers_id)
     WHERE (
@@ -288,11 +288,11 @@ INSERT INTO services.t_databases
             WHERE databases.t_customers_id = t_customers.t_customers_id
     ) < 20
     RETURNING t_databases.t_databases_id, t_databases.database_name, t_databases.username, t_databases.t_customers_id,
-    t_databases.approved, (SELECT t_services.service_type FROM t_services WHERE t_services.t_services_id = t_databases.t_services_id),
+    t_databases.approved, (SELECT t_services.service_type FROM services.t_services WHERE t_services.t_services_id = t_databases.t_services_id),
     (SELECT t_addresses.name || '.' || t_domains.name
-        FROM t_services
-        JOIN t_addresses USING (t_addresses_id)
-        JOIN t_domains ON (t_domains.t_domains_id = t_addresses.t_domains_id)
+        FROM services.t_services
+        JOIN services.t_addresses USING (t_addresses_id)
+        JOIN services.t_domains ON (t_domains.t_domains_id = t_addresses.t_domains_id)
         WHERE t_services.t_services_id = t_databases.t_services_id),
     t_databases.info;
 );
@@ -308,7 +308,7 @@ DO INSTEAD
 UPDATE services.t_databases SET
 info = NEW.info,
 approved = ((public.is_admin() AND NEW.approved) OR OLD.approved)
-FROM t_customers, users
+FROM services.t_customers, users
 WHERE t_databases.t_databases_id = new.t_databases_id
 AND t_databases.t_customers_id = t_customers.t_customers_id
 AND t_customers.t_customers_id = users.t_customers_id
@@ -323,7 +323,7 @@ AS
 ON DELETE TO public.databases
 DO INSTEAD
 (
-    DELETE FROM t_databases
+    DELETE FROM services.t_databases
     USING t_customers, t_users
     WHERE t_databases.t_databases_id = OLD.t_databases_id
     AND t_databases.t_customers_id = t_users.t_customers_id

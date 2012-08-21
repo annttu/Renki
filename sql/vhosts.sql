@@ -66,20 +66,20 @@ t_vhosts.logaccess,
 t_vhosts.locked,
 t_dom.t_domains_id,
 t_vhosts.t_services_id
-FROM t_vhosts
-JOIN t_domains as t_dom ON (t_vhosts.t_domains_id = t_dom.t_domains_id)
-JOIN t_users ON (t_users.t_users_id = t_vhosts.t_users_id)
-JOIN t_customers ON (t_users.t_customers_id = t_customers.t_customers_id)
-LEFT JOIN t_vhosts AS t_vhost_aliases ON (t_vhosts.t_vhosts_id = t_vhost_aliases.parent_id
+FROM services.t_vhosts
+JOIN services.t_domains as t_dom ON (t_vhosts.t_domains_id = t_dom.t_domains_id)
+JOIN services.t_users ON (t_users.t_users_id = t_vhosts.t_users_id)
+JOIN services.t_customers ON (t_users.t_customers_id = t_customers.t_customers_id)
+LEFT JOIN services.t_vhosts AS t_vhost_aliases ON (t_vhosts.t_vhosts_id = t_vhost_aliases.parent_id
     AND NOT t_vhost_aliases.is_redirect
     AND t_vhost_aliases.redirect_to IS NULL
     AND t_vhost_aliases.t_users_id = t_users.t_users_id)
-LEFT JOIN t_vhosts AS t_vhost_redirects ON (t_vhosts.t_vhosts_id = t_vhost_redirects.parent_id
+LEFT JOIN services.t_vhosts AS t_vhost_redirects ON (t_vhosts.t_vhosts_id = t_vhost_redirects.parent_id
     AND t_vhost_redirects.is_redirect
     AND t_vhost_redirects.redirect_to IS NULL
     AND t_vhost_redirects.t_users_id = t_users.t_users_id)
-LEFT JOIN t_domains AS t_aliases_domains ON (t_aliases_domains.t_domains_id = t_vhost_aliases.t_domains_id)
-LEFT JOIN t_domains AS t_redirects_domains ON (t_redirects_domains.t_domains_id = t_vhost_redirects.t_domains_id)
+LEFT JOIN services.t_domains AS t_aliases_domains ON (t_aliases_domains.t_domains_id = t_vhost_aliases.t_domains_id)
+LEFT JOIN services.t_domains AS t_redirects_domains ON (t_redirects_domains.t_domains_id = t_vhost_redirects.t_domains_id)
 WHERE t_vhosts.parent_id IS NULL
 AND  (t_users.name = CURRENT_USER OR public.is_admin())
 AND t_users.t_customers_id = t_customers.t_customers_id
@@ -97,10 +97,10 @@ SELECT t_vhosts.t_vhosts_id, t_vhosts.t_users_id, t_customers.t_customers_id,
 vhostdomaincat(t_vhosts.name, t_domains.name::text) as name,
 t_domains.t_domains_id,
 t_vhosts.parent_id
-FROM t_vhosts
-JOIN t_domains ON (t_vhosts.t_domains_id = t_domains.t_domains_id)
-JOIN t_users ON (t_vhosts.t_users_id = t_users.t_users_id)
-JOIN t_customers ON (t_users.t_customers_id = t_customers.t_customers_id)
+FROM services.t_vhosts
+JOIN services.t_domains ON (t_vhosts.t_domains_id = t_domains.t_domains_id)
+JOIN services.t_users ON (t_vhosts.t_users_id = t_users.t_users_id)
+JOIN services.t_customers ON (t_users.t_customers_id = t_customers.t_customers_id)
 WHERE t_vhosts.parent_id IS NOT NULL
 AND  (t_users.name = CURRENT_USER OR public.is_admin())
 AND NOT t_vhosts.is_redirect
@@ -114,10 +114,10 @@ SELECT t_vhosts.t_vhosts_id, t_vhosts.t_users_id, t_customers.t_customers_id,
 vhostdomaincat(t_vhosts.name, t_domains.name::text) as name,
 t_domains.t_domains_id,
 t_vhosts.parent_id
-FROM t_vhosts
-JOIN t_domains ON (t_vhosts.t_domains_id = t_domains.t_domains_id)
-JOIN t_users ON (t_vhosts.t_users_id = t_users.t_users_id)
-JOIN t_customers ON (t_users.t_customers_id = t_customers.t_customers_id)
+FROM services.t_vhosts
+JOIN services.t_domains ON (t_vhosts.t_domains_id = t_domains.t_domains_id)
+JOIN services.t_users ON (t_vhosts.t_users_id = t_users.t_users_id)
+JOIN services.t_customers ON (t_users.t_customers_id = t_customers.t_customers_id)
 WHERE t_vhosts.parent_id IS NOT NULL
 AND  (t_users.name = CURRENT_USER OR public.is_admin())
 AND (t_vhosts.is_redirect
@@ -144,7 +144,7 @@ NEW.redirect_to,
 (public.is_admin() AND NEW.locked),
 select_vhost_server(NEW.name, NEW.t_services_id)
 FROM users
-JOIN t_customers USING (t_customers_id)
+JOIN services.t_customers USING (t_customers_id)
 WHERE (
         (users.name = CURRENT_USER  AND NOT public.is_admin())
     OR
@@ -176,7 +176,7 @@ find_vhost(unnest(new.aliases)) as name,
 vhosts.t_vhosts_id,
 select_vhost_server(NEW.name, NEW.t_services_id)
 FROM users
-JOIN t_customers USING (t_customers_id)
+JOIN services.t_customers USING (t_customers_id)
 JOIN vhosts USING (t_users_id)
 WHERE (
         (users.name = CURRENT_USER  AND NOT public.is_admin())
@@ -200,7 +200,7 @@ vhosts.t_vhosts_id,
 true,
 select_vhost_server(NEW.name, NEW.t_services_id)
 FROM users
-JOIN t_customers USING (t_customers_id)
+JOIN services.t_customers USING (t_customers_id)
 JOIN vhosts USING (t_users_id)
 WHERE (
         (users.name = CURRENT_USER  AND NOT public.is_admin())
@@ -233,7 +233,7 @@ SET
 redirect_to = NEW.redirect_to,
 logaccess = (public.is_admin() AND NEW.logaccess),
 locked = (public.is_admin() AND NEW.locked)
-FROM t_customers, users
+FROM services.t_customers, users
 WHERE t_vhosts.t_vhosts_id = new.t_vhosts_id
 AND old.t_users_id = users.t_users_id
 AND t_customers.t_customers_id = users.t_customers_id
@@ -243,7 +243,7 @@ RETURNING t_vhosts_id, (SELECT users.t_customers_id FROM users WHERE users.t_use
     t_vhosts.created, (SELECT vhostdomaincat(t_vhosts.name, domains.name) FROM domains WHERE domains.t_domains_id = t_vhosts.t_domains_id),
     ARRAY[]::text[], ARRAY[]::text[], t_vhosts.redirect_to, t_vhosts.logaccess,t_vhosts.locked,t_vhosts.t_domains_id,t_vhosts.t_services_id;
 -- delete removed alias row from t_vhost_aliases table
-DELETE FROM t_vhosts
+DELETE FROM services.t_vhosts
 WHERE parent_id = old.t_vhosts_id
 AND (
     t_vhosts_id IN (
@@ -291,14 +291,14 @@ CREATE OR REPLACE RULE vhosts_delete
 AS ON DELETE TO vhosts
 DO INSTEAD
 (
-DELETE FROM t_vhosts USING t_customers, t_users
+DELETE FROM services.t_vhosts USING t_customers, t_users
 WHERE t_vhosts.parent_id = OLD.t_vhosts_id
 AND old.t_users_id = t_users.t_users_id
 AND t_customers.t_customers_id = t_users.t_customers_id
 AND (t_users.name = CURRENT_USER  OR public.is_admin())
 --LIMIT 50
 ;
-DELETE FROM t_vhosts USING t_customers, t_users
+DELETE FROM services.t_vhosts USING t_customers, t_users
 WHERE t_vhosts.t_vhosts_id = OLD.t_vhosts_id
 AND old.t_customers_id = t_customers.t_customers_id
 AND t_customers.t_customers_id = t_users.t_customers_id
@@ -316,11 +316,11 @@ AS
 SELECT t_services.t_services_id,
 t_addresses.name || '.' || t_domains.name as server,
 t_services.info as info
-FROM t_services
-JOIN t_addresses ON t_services.t_addresses_id = t_addresses.t_addresses_id
-JOIN t_domains ON (t_services.t_domains_id = t_domains.t_domains_id)
+FROM services.t_services
+JOIN services.t_addresses ON t_services.t_addresses_id = t_addresses.t_addresses_id
+JOIN services.t_domains ON (t_services.t_domains_id = t_domains.t_domains_id)
 JOIN users ON users.name = CURRENT_USER
-JOIN t_customers ON (t_customers.t_customers_id = users.t_customers_id)
+JOIN services.t_customers ON (t_customers.t_customers_id = users.t_customers_id)
 WHERE t_services.service_type = 'VHOST'
 AND t_services.public = TRUE
 AND t_services.active = TRUE

@@ -13,20 +13,20 @@ t_vhosts.redirect_to,
 t_vhosts.logaccess,
 t_vhosts.locked,
 t_users.unix_id
-FROM t_vhosts
-JOIN t_domains as t_dom ON (t_vhosts.t_domains_id = t_dom.t_domains_id)
-JOIN t_users ON (t_users.t_users_id = t_vhosts.t_users_id)
-JOIN t_customers ON (t_users.t_customers_id = t_customers.t_customers_id)
-LEFT JOIN t_vhosts AS t_vhost_aliases ON (t_vhosts.t_vhosts_id = t_vhost_aliases.parent_id
+FROM services.t_vhosts
+JOIN services.t_domains as t_dom ON (t_vhosts.t_domains_id = t_dom.t_domains_id)
+JOIN services.t_users ON (t_users.t_users_id = t_vhosts.t_users_id)
+JOIN services.t_customers ON (t_users.t_customers_id = t_customers.t_customers_id)
+LEFT JOIN services.t_vhosts AS t_vhost_aliases ON (t_vhosts.t_vhosts_id = t_vhost_aliases.parent_id
     AND NOT t_vhost_aliases.is_redirect
     AND t_vhost_aliases.redirect_to IS NULL
     AND t_vhost_aliases.t_users_id = t_users.t_users_id)
-LEFT JOIN t_vhosts AS t_vhost_redirects ON (t_vhosts.t_vhosts_id = t_vhost_redirects.parent_id
+LEFT JOIN services.t_vhosts AS t_vhost_redirects ON (t_vhosts.t_vhosts_id = t_vhost_redirects.parent_id
     AND t_vhost_redirects.is_redirect
     AND t_vhost_redirects.redirect_to IS NULL
     AND t_vhost_redirects.t_users_id = t_users.t_users_id)
-LEFT JOIN t_domains AS t_aliases_domains ON (t_aliases_domains.t_domains_id = t_vhost_aliases.t_domains_id)
-LEFT JOIN t_domains AS t_redirects_domains ON (t_redirects_domains.t_domains_id = t_vhost_redirects.t_domains_id)
+LEFT JOIN services.t_domains AS t_aliases_domains ON (t_aliases_domains.t_domains_id = t_vhost_aliases.t_domains_id)
+LEFT JOIN services.t_domains AS t_redirects_domains ON (t_redirects_domains.t_domains_id = t_vhost_redirects.t_domains_id)
 WHERE t_vhosts.parent_id IS NULL
 AND t_users.t_customers_id = t_customers.t_customers_id
 GROUP BY t_vhosts.t_vhosts_id,t_dom.name,t_customers.t_customers_id,t_users.name,t_users.unix_id;
@@ -232,12 +232,12 @@ AS
 SELECT t_user_ports.t_user_ports_id, t_user_ports.t_users_id, t_user_ports.port, t_user_ports.info, t_user_ports.t_services_id,
 t_user_ports.approved, t_user_ports.active, t_users.name, t_users.t_customers_id, t_users.unix_id,
 (t_addresses.name || '.'::text) || t_domains.name AS server, t_addresses.t_hosts_id as t_hosts_id
-FROM t_user_ports
-JOIN t_users USING (t_users_id)
-JOIN t_customers ON t_users.t_customers_id = t_customers.t_customers_id
-JOIN t_services USING (t_services_id)
-JOIN t_addresses ON (t_services.t_addresses_id = t_addresses.t_addresses_id)
-JOIN t_domains ON t_addresses.t_domains_id = t_domains.t_domains_id
+FROM services.t_user_ports
+JOIN services.t_users USING (t_users_id)
+JOIN services.t_customers ON t_users.t_customers_id = t_customers.t_customers_id
+JOIN services.t_services USING (t_services_id)
+JOIN services.t_addresses ON (t_services.t_addresses_id = t_addresses.t_addresses_id)
+JOIN services.t_domains ON t_addresses.t_domains_id = t_domains.t_domains_id
 WHERE t_user_ports.t_services_id = t_services.t_services_id;
 
 GRANT SELECT ON services.s_user_ports TO servers;

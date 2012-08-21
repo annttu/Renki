@@ -1,3 +1,4 @@
+
 ------------------
 -- t_change_log --
 ------------------
@@ -153,9 +154,9 @@ GRANT SELECT ON public.users TO admins;
 
 CREATE OR REPLACE VIEW public.customers AS
 SELECT t_customers.t_customers_id, t_customers.name, array_agg(distinct t_aliases.alias) as aliases
-FROM t_customers
-JOIN t_users USING (t_customers_id)
-LEFT JOIN t_aliases USING (t_customers_id)
+FROM services.t_customers
+JOIN services.t_users USING (t_customers_id)
+LEFT JOIN services.t_aliases USING (t_customers_id)
 WHERE (t_users.name = CURRENT_USER OR public.is_admin())
 GROUP BY t_customers.t_customers_id;
 
@@ -226,7 +227,7 @@ admin_address=new.admin_address,
 domain_type=new.domain_type,
 masters=new.masters,
 allow_transfer=new.allow_transfer
-FROM t_customers, t_users
+FROM services.t_customers, services.t_users
 WHERE t_domains.t_domains_id = new.t_domains_id
 AND old.t_customers_id = t_customers.t_customers_id
 AND t_customers.t_customers_id = t_users.t_customers_id
@@ -235,7 +236,7 @@ AND (( t_users.name = CURRENT_USER AND NOT public.is_admin()) OR public.is_admin
 CREATE OR REPLACE RULE domains_delete
 AS ON DELETE TO domains
 DO INSTEAD
-DELETE FROM t_domains USING t_customers, t_users
+DELETE FROM services.t_domains USING services.t_customers, services.t_users
 WHERE t_domains.t_domains_id = OLD.t_domains_id
 AND old.t_customers_id = t_customers.t_customers_id
 AND t_customers.t_customers_id = t_users.t_customers_id

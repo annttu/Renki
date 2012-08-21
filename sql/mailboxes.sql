@@ -35,12 +35,12 @@ CREATE OR REPLACE VIEW public.mailboxes
 AS
 SELECT t_mailboxes.t_mailboxes_id, t_mailboxes.name || '@' || t_domain_mail.name as name, t_mailboxes.t_customers_id, t_mailboxes.created,
 array_agg(t_mail_aliases.name || '@' || t_domains.name) AS aliases, t_domain_mail.t_domains_id
-  FROM t_mailboxes
-  JOIN t_customers USING (t_customers_id)
-  JOIN t_users USING (t_customers_id)
-  JOIN t_domains as t_domain_mail ON t_mailboxes.t_domains_id = t_domain_mail.t_domains_id
-  LEFT JOIN t_mail_aliases USING (t_mailboxes_id)
-  LEFT JOIN t_domains ON t_mail_aliases.t_domains_id = t_domains.t_domains_id
+  FROM services.t_mailboxes
+  JOIN services.t_customers USING (t_customers_id)
+  JOIN services.t_users USING (t_customers_id)
+  JOIN services.t_domains as t_domain_mail ON t_mailboxes.t_domains_id = t_domain_mail.t_domains_id
+  LEFT JOIN services.t_mail_aliases USING (t_mailboxes_id)
+  LEFT JOIN services.t_domains ON t_mail_aliases.t_domains_id = t_domains.t_domains_id
  WHERE (t_users.name = CURRENT_USER OR public.is_admin())
  GROUP BY t_mailboxes.t_mailboxes_id, t_domain_mail.t_domains_id, t_domain_mail.t_domains_id;
 
@@ -51,9 +51,9 @@ CREATE OR REPLACE VIEW public.mail_aliases AS
 SELECT t_mail_aliases.t_mail_aliases_id, t_mail_aliases.t_customers_id, t_mail_aliases.t_mailboxes_id,
 emaildomaincat(t_mail_aliases.name, t_domains.name::text) AS alias,
 t_domains.t_domains_id
-FROM t_mail_aliases
-JOIN t_domains on t_mail_aliases.t_domains_id = t_domains.t_domains_id
-JOIN t_users ON t_mail_aliases.t_customers_id =  t_users.t_customers_id
+FROM services.t_mail_aliases
+JOIN services.t_domains on t_mail_aliases.t_domains_id = t_domains.t_domains_id
+JOIN services.t_users ON t_mail_aliases.t_customers_id =  t_users.t_customers_id
 WHERE (t_users.name = CURRENT_USER OR public.is_admin());
 
 GRANT SELECT ON public.mail_aliases TO users;
@@ -103,14 +103,14 @@ DO INSTEAD
 SET
 t_domains_id = public.mail_domain(NEW.name),
 name = public.mail_name(NEW.name)
-FROM t_customers, users, t_domains
+FROM services.t_customers, users, services.t_domains
 WHERE t_mailboxes.t_mailboxes_id = new.t_mailboxes_id
 AND old.t_customers_id = t_customers.t_customers_id
 AND t_domains.t_customers_id = users.t_customers_id
 AND t_customers.t_customers_id = users.t_customers_id
 AND ((users.name = CURRENT_USER  AND NOT public.is_admin()) OR (public.is_admin() AND users.t_customers_id = OLD.t_customers_id));
 -- delete removed alias row from t_vhost_aliases table
-DELETE FROM t_mail_aliases
+DELETE FROM services.t_mail_aliases
 WHERE t_mail_aliases.t_mailboxes_id = old.t_mailboxes_id
 AND t_mail_aliases.t_mail_aliases_id IN (
     SELECT mail_aliases.t_mail_aliases_id
@@ -134,14 +134,14 @@ CREATE OR REPLACE RULE mailboxes_delete
 AS ON DELETE TO mailboxes
 DO INSTEAD
 (
-DELETE FROM t_mail_aliases USING t_customers, t_users
+DELETE FROM services.t_mail_aliases USING services.t_customers, services.t_users
 WHERE t_mail_aliases.t_mailboxes_id = OLD.t_mailboxes_id
 AND old.t_customers_id = t_customers.t_customers_id
 AND t_customers.t_customers_id = t_users.t_customers_id
 AND ( t_users.name = "current_user"()::text OR public.is_admin())
 -- LIMIT 50
 ;
-DELETE FROM t_mailboxes USING t_customers, t_users
+DELETE FROM services.t_mailboxes USING services.t_customers, services.t_users
 WHERE t_mailboxes.t_mailboxes_id = OLD.t_mailboxes_id
 AND old.t_customers_id = t_customers.t_customers_id
 AND t_customers.t_customers_id = t_users.t_customers_id
