@@ -30,7 +30,7 @@ ALTER TABLE t_mail_aliases ADD CONSTRAINT valid_name CHECK (lower(name) ~* $t$^[
 SELECT create_log_triggers('services.t_mail_aliases'::text);
 SELECT create_log_triggers('services.t_mailboxes'::text);
 
-DROP VIEW public.mailboxes;
+DROP VIEW IF EXISTS public.mailboxes;
 CREATE OR REPLACE VIEW public.mailboxes
 AS
 SELECT t_mailboxes.t_mailboxes_id, t_mailboxes.name || '@' || t_domain_mail.name as name, t_mailboxes.t_customers_id, t_mailboxes.created,

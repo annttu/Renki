@@ -85,7 +85,7 @@ class User_ports(object):
             self.main.session.rollback()
             raise DoesNotExist('Port %d on server %s not found' % (port, server))
 
-    def add(self, server):
+    def add(self, server, info=None):
         """Open port on given <server>
         Raises RuntimeError if server not found
         Raises RuntimeError on error
@@ -102,6 +102,7 @@ class User_ports(object):
         port.t_customers_id = self.main.customer_id
         port.username = self.main.username
         port.server = host.server
+        port.info = info
         self.main.session.add(port)
         try:
             self.main.session.commit()

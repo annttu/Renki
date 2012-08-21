@@ -12,8 +12,8 @@ CREATE TABLE services.t_change_log
   username text NOT NULL DEFAULT "session_user"()
 );
 
-COMMENT ON COLUMN t_change_log.event_type IS 'INSERT, UPDATE, DELETE';
-GRANT USAGE ON t_change_log_t_change_log_id_seq to users;
+COMMENT ON COLUMN services.t_change_log.event_type IS 'INSERT, UPDATE, DELETE';
+GRANT USAGE ON services.t_change_log_t_change_log_id_seq to users;
 
 GRANT SELECT ON services.t_change_log TO admins;
 
@@ -56,7 +56,7 @@ CREATE TABLE services.t_aliases
     alias text NOT NULL UNIQUE
 );
 
-SELECT create_log_triggers('services.t_aliases'::text);
+SELECT services.create_log_triggers('services.t_aliases'::text);
 
 GRANT SELECT,UPDATE,INSERT,DELETE ON services.t_aliases TO admins;
 GRANT USAGE ON services.t_aliases_t_aliases_id_seq TO admins;
@@ -83,7 +83,7 @@ CREATE TABLE services.t_domains (
     allow_transfer inet[]
 );
 
-SELECT create_log_triggers('services.t_domains'::text);
+SELECT services.create_log_triggers('services.t_domains'::text);
 
 ALTER TABLE t_domains ADD CONSTRAINT "domains_check" CHECK (
     refresh_time >= 1
@@ -120,7 +120,7 @@ CREATE TABLE services.t_domain_dns_keys (
     t_dns_keys_id integer NOT NULL
 );
 
-SELECT create_log_triggers('services.t_dns_keys'::text);
+SELECT services.create_log_triggers('services.t_dns_keys'::text);
 
 -- USERS
 
@@ -134,13 +134,13 @@ CREATE TABLE services.t_users (
     phone text,
     unix_id integer UNIQUE,
     password_changed timestamp with time zone DEFAULT now() NOT NULL,
-    t_domains_id integer references t_domains NOT NULL
+    t_domains_id integer references services.t_domains NOT NULL
 );
 
 GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_users TO admins;
 GRANT SELECT ON services.t_users TO servers;
 
-SELECT create_log_triggers('services.t_users'::text);
+SELECT services.create_log_triggers('services.t_users'::text);
 
 CREATE OR REPLACE VIEW public.users AS
     SELECT t_users.t_customers_id, t_users.name, t_users.lastname, t_users.firstnames, t_users.phone,
@@ -170,9 +170,9 @@ SELECT t_domains.t_domains_id, t_domains.name, t_domains.shared, t_domains.t_cus
 t_domains.dns, t_domains.created, t_domains.updated, t_domains.refresh_time, t_domains.retry_time,
 t_domains.expire_time, t_domains.minimum_cache_time, t_domains.ttl, t_domains.admin_address,
 t_domains.domain_type, t_domains.masters, t_domains.allow_transfer
-FROM t_domains
-JOIN t_customers USING (t_customers_id)
-JOIN t_users USING (t_customers_id)
+FROM services.t_domains
+JOIN services.t_customers USING (t_customers_id)
+JOIN services.t_users USING (t_customers_id)
 WHERE ((( t_users.name = "current_user"()::text AND public.is_admin() IS FALSE) OR t_domains.shared = TRUE ) OR public.is_admin())
 -- if there many users in one customers
 GROUP BY t_domains.t_domains_id;
@@ -180,7 +180,7 @@ GROUP BY t_domains.t_domains_id;
 CREATE OR REPLACE RULE domains_insert
 AS ON INSERT TO public.domains
 DO INSTEAD
-INSERT INTO t_domains
+INSERT INTO services.t_domains
 (t_customers_id, name, shared,dns,refresh_time,retry_time,expire_time,minimum_cache_time,ttl,admin_address,domain_type,masters,allow_transfer)
 SELECT DISTINCT(t_customers_id),
 NEW.name,
@@ -249,7 +249,7 @@ ALTER TABLE public.domains ALTER retry_time SET DEFAULT 7200;
 ALTER TABLE public.domains ALTER minimum_cache_time SET DEFAULT 21600;
 ALTER TABLE public.domains ALTER expire_time SET DEFAULT 1209600;
 ALTER TABLE public.domains ALTER ttl SET DEFAULT 10800;
-ALTER TABLE public.domains ALTER domain_type SET DEFAULT 'master';
+ALTER TABLE public.domains ALTER domain_type SET DEFAULT 'MASTER';
 ALTER TABLE public.domains ALTER admin_address SET DEFAULT 'hostmaster@example.com';
 
 GRANT SELECT,INSERT,UPDATE,DELETE ON public.domains TO users;
@@ -271,7 +271,7 @@ CREATE TABLE services.t_dns_entries
     t_domains_id integer references services.t_domains
 );
 
-SELECT create_log_triggers('services.t_dns_entries'::text);
+SELECT services.create_log_triggers('services.t_dns_entries'::text);
 
 GRANT SELECT ON services.t_dns_entries TO servers;
 GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_dns_entries TO admins;

@@ -35,9 +35,9 @@ ALTER TABLE services.t_vhosts add unique(t_domains_id, name);
 
 SELECT create_log_triggers('services.t_vhosts'::text);
 
-DROP TRIGGER t_vhosts_delete_update_dns ON t_vhosts;
-DROP TRIGGER t_vhosts_insert_update_dns ON t_vhosts;
-DROP TRIGGER t_vhosts_update_update_dns ON t_vhosts;
+DROP TRIGGER IF EXISTS t_vhosts_delete_update_dns ON t_vhosts;
+DROP TRIGGER IF EXISTS t_vhosts_insert_update_dns ON t_vhosts;
+DROP TRIGGER IF EXISTS t_vhosts_update_update_dns ON t_vhosts;
 
 CREATE TRIGGER t_vhosts_insert_update_dns
 AFTER INSERT ON t_vhosts
