@@ -100,6 +100,11 @@ ALTER TABLE t_domains ADD CONSTRAINT "domains_check" CHECK (
 ALTER TABLE t_domains ADD CONSTRAINT "valid_admin_address" CHECK (
     admin_address ~ '^[^@\s]+@[^@\s]+(\.[^@\s]+)+$');
 
+
+GRANT INSERT,UPDATE,SELECT,DELETE ON services.t_domains TO admins;
+GRANT SELECT ON services.t_domains TO servers;
+
+
 CREATE TABLE services.t_dns_keys (
     t_dns_keys_id integer PRIMARY KEY NOT NULL,
     name text NOT NULL,
@@ -133,6 +138,7 @@ CREATE TABLE services.t_users (
 );
 
 GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_users TO admins;
+GRANT SELECT ON services.t_users TO servers;
 
 SELECT create_log_triggers('services.t_users'::text);
 
@@ -246,8 +252,8 @@ ALTER TABLE public.domains ALTER ttl SET DEFAULT 10800;
 ALTER TABLE public.domains ALTER domain_type SET DEFAULT 'master';
 ALTER TABLE public.domains ALTER admin_address SET DEFAULT 'hostmaster@example.com';
 
-GRANT SELECT,INSERT,UPDATE,DELETE ON domains TO users;
-GRANT SELECT,INSERT,UPDATE,DELETE ON domains TO admins;
+GRANT SELECT,INSERT,UPDATE,DELETE ON public.domains TO users;
+GRANT SELECT,INSERT,UPDATE,DELETE ON public.domains TO admins;
 GRANT USAGE ON services.t_domains_t_domains_id_seq TO users;
 GRANT USAGE ON services.t_domains_t_domains_id_seq TO admins;
 
@@ -266,3 +272,6 @@ CREATE TABLE services.t_dns_entries
 );
 
 SELECT create_log_triggers('services.t_dns_entries'::text);
+
+GRANT SELECT ON services.t_dns_entries TO servers;
+GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_dns_entries TO admins;
