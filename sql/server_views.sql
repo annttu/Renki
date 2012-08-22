@@ -248,7 +248,7 @@ ALTER TABLE s_user_ports_history SET SCHEMA services;
 GRANT SELECT ON services.s_user_ports_history TO servers;
 GRANT SELECT ON services.s_user_ports_history TO admins;
 
-DROP FUNCTION t_users_historize_s_user_ports_trigger();
+DROP FUNCTION IF EXISTS t_users_historize_s_user_ports_trigger();
 CREATE OR REPLACE FUNCTION t_users_historize_s_user_ports_trigger()
 RETURNS TRIGGER
 AS $t$

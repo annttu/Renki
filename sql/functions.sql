@@ -17,7 +17,8 @@ BEGIN
         END LOOP;
     RETURN false;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+IMMUTABLE;
 
 -- do users really need this??
 GRANT EXECUTE ON FUNCTION public.is_admin(text) TO users;
@@ -39,7 +40,8 @@ DECLARE
 BEGIN
     RETURN public.is_admin(CURRENT_USER);
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+IMMUTABLE;
 
 GRANT EXECUTE ON FUNCTION public.is_admin() TO users;
 GRANT EXECUTE ON FUNCTION public.is_admin() TO admins;
@@ -62,7 +64,8 @@ BEGIN
     END LOOP;
     RETURN;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+IMMUTABLE;
 
 -- It's needed by users and admins and maybe servers
 GRANT EXECUTE ON FUNCTION public.compare_arrays(text[], text[]) TO users;
@@ -73,7 +76,8 @@ GRANT EXECUTE ON FUNCTION public.compare_arrays(text[], text[]) TO servers;
 -- Currently not used and will be removed in future
 CREATE OR REPLACE FUNCTION public.last_elem (text[]) RETURNS text AS $$
  SELECT $1[array_length($1,1)];
-$$ LANGUAGE SQL;
+$$ LANGUAGE SQL
+IMMUTABLE;
 
 GRANT EXECUTE ON FUNCTION public.last_elem(text[]) TO users;
 GRANT EXECUTE ON FUNCTION public.last_elem(text[]) TO admins;
@@ -106,7 +110,8 @@ CREATE OR REPLACE FUNCTION public.vhostdomaincat(vhost text, domain text) RETURN
       RETURN vhost || '.' || domain;
     END IF;
   END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+IMMUTABLE;
 
 GRANT EXECUTE ON FUNCTION public.vhostdomaincat(text,text) TO admins;
 GRANT EXECUTE ON FUNCTION public.vhostdomaincat(text,text) TO users;
@@ -124,7 +129,8 @@ CREATE OR REPLACE FUNCTION public.emaildomaincat(name text, domain text) RETURNS
       RETURN name || '@' || domain;
     END IF;
   END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+IMMUTABLE;
 
 GRANT EXECUTE ON FUNCTION public.emaildomaincat(text,text) TO admins;
 GRANT EXECUTE ON FUNCTION public.emaildomaincat(text,text) TO users;
@@ -180,7 +186,8 @@ CREATE OR REPLACE FUNCTION public.find_domain(domain text) RETURNS integer AS $$
     RAISE EXCEPTION 'Domain for vhost % not found', domain;
     RETURN NULL;
   END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+STABLE;
 
 GRANT EXECUTE ON FUNCTION public.find_domain(text) TO users;
 GRANT EXECUTE ON FUNCTION public.find_domain(text) TO admins;
@@ -217,7 +224,8 @@ BEGIN
     END IF;
     RAISE EXCEPTION 'vhost for url % not found', string;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+STABLE;
 
 GRANT EXECUTE ON FUNCTION public.find_vhost(text) TO users;
 GRANT EXECUTE ON FUNCTION public.find_vhost(text) TO admins;
@@ -245,7 +253,8 @@ BEGIN
     END LOOP;
     RAISE EXCEPTION 'unkown domain on address %', mail;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+STABLE;
 
 GRANT EXECUTE ON FUNCTION public.mail_name(text) TO users;
 GRANT EXECUTE ON FUNCTION public.mail_name(text) TO admins;
@@ -274,7 +283,8 @@ BEGIN
     END LOOP;
     RAISE EXCEPTION 'Unknown domain on address %', mail;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+STABLE;
 
 GRANT EXECUTE ON FUNCTION public.mail_domain(text) TO users;
 GRANT EXECUTE ON FUNCTION public.mail_domain(text) TO admins;
@@ -475,7 +485,8 @@ ELSE
         END IF;
     END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+STABLE;
 
 -- historize view function creates trigger to table
 -- on update or delete to view, copy related tables rows to histrory tables
@@ -645,7 +656,8 @@ BEGIN
     END IF;
     RAISE EXCEPTION 'Subnet % not found', subnet_id;
 END;
-$f$ LANGUAGE plpgsql;
+$f$ LANGUAGE plpgsql
+STABLE;
 
 GRANT EXECUTE ON FUNCTION services.ip_on_subnet(inet, integer) TO admins;
 
@@ -677,7 +689,8 @@ BEGIN
     END LOOP;
     RETURN FALSE;
 END;
-$f$ LANGUAGE plpgsql;
+$f$ LANGUAGE plpgsql
+STABLE;
 
 GRANT EXECUTE ON FUNCTION public.require_alias(text) TO users;
 GRANT EXECUTE ON FUNCTION public.require_alias(text) TO admins;
@@ -714,12 +727,13 @@ BEGIN
     END LOOP;
     RETURN FALSE;
 END;
-$f$ LANGUAGE plpgsql;
+$f$ LANGUAGE plpgsql
+STABLE;
 
 GRANT EXECUTE ON FUNCTION public.valid_database_name(text) TO users;
 GRANT EXECUTE ON FUNCTION public.valid_database_name(text) TO admins;
 
-CREATE OR REPLACE FUNCTION add_vhost_dns_entries()
+CREATE OR REPLACE FUNCTION public.add_vhost_dns_entries()
 RETURNS TRIGGER
 AS
 $$
@@ -770,7 +784,8 @@ BEGIN
     END IF;
 END;
 $$
-LANGUAGE plpgsql;
+LANGUAGE plpgsql
+VOLATILE;
 
 
 
@@ -795,4 +810,5 @@ BEGIN
     END IF;
 END;
 $$
-language plpgsql;
+language plpgsql
+STABLE;
