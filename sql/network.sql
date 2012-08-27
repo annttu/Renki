@@ -32,8 +32,8 @@ CREATE TABLE services.t_hosts
     t_hosts_id serial NOT NULL PRIMARY KEY,
     name text NOT NULL UNIQUE,
     type t_hosts_type NOT NULL DEFAULT 'VIRTUAL',
-    t_domains_id integer references t_domains,
-    t_customers_id integer references t_customers,
+    t_domains_id integer references t_domains NOT NULL,
+    t_customers_id integer references t_customers NOT NULL,
     location text NOT NULL DEFAULT ''
 );
 

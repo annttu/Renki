@@ -47,6 +47,34 @@ Dokumentaatio tietokannoista
 * taulu, johon aliakset referoi
 * sisältää tiedot vhostin omistajasta
 * referoi domainiin
+* dns-tietueet lisätään, päivitetään ja poistetaan automaattisesti
+
+== Kentät ==
+* t_vhosts_id Vhost-tietueen uniikki id
+* t_users_id viittaus t_users taulussa olevaan käyttäjään
+* parent_id jos tämä rivi on alias tai redirect, viittaus parent riviin
+* t_services_id viittaus t_services taulussa olevaan vhost-palvelimeen, mikä palvelee tämän  vhostin
+** Käytetään dns-tietueen luomiseen
+* name text not null,
+* created timestamptz default now(),
+* t_domains_id integer not null REFERENCES t_domains,
+* is_redirect boolean default false not null,
+* logaccess boolean default false not null,
+* redirect_to text default null,
+* locked boolean default false not null,
+* disabled boolean DEFAULT FALSE NOT NULL,
+* document_root text,t_users_id integer REFERENCES t_users NOT NULL,
+parent_id integer REFERENCES t_vhosts,
+t_services_id integer REFERENCES t_services,
+name text not null,
+created timestamptz default now(),
+t_domains_id integer not null REFERENCES t_domains,
+is_redirect boolean default false not null,
+logaccess boolean default false not null,
+redirect_to text default null,
+locked boolean default false not null,
+disabled boolean DEFAULT FALSE NOT NULL,
+document_root text,
 
 
 === t_hosts ===
@@ -71,6 +99,13 @@ Dokumentaatio tietokannoista
 * mtu (integer) verkon mtu, oletuksena 1500
 * hostmaster_address (text) verkon vastaavan sähköpostiosoite (dns tietuetta varten)
 
+=== t_user_ports ===
+* Taulu, joka sisältää tiedon käyttäjien avoimista porteista shell-palvelimilla
+* portit väliltä 40000 - 65536
+* portti valitaan automaattisesti
+
+=== t_change_log ===
+* Taulu, joka sisältää tiedot tietokantaan tehdyistä muutoksista
 
 ==========
 = Viewit =
@@ -83,12 +118,21 @@ Dokumentaatio tietokannoista
 * insertoidessa customer_id on defaulttina käyttäjän customer_id
 ** vain admin voi käyttää jotain muuta customer_id:tä
 
-=== t_user_ports ===
-* Taulu, joka sisältää tiedon käyttäjien avoimista porteista shell-palvelimilla
-* portit väliltä 40000 - 65536
+* t_vhosts_id  Vhostin unikki id
+* t_customers_id Jäsenen id, pakollinen kenttä
+* username  käyttäjän nimi, pakollinen kenttä
+* t_users_id käyttäjän id
+* created tieto millon vhost on luotu ( vain luku ) 
+* name vhostin koko osoite
+* aliases vhostin mahdolliset aliakset
+* redirects osoitteet, mitkä edelleenohjataan tähän vhostiin
+* redirect_to vhost on edelleenohjaus tähän osoitteeseen
+* logaccess onko käyttäjällä oikeus lukea access.log:ia, vain admin voi muuttaa
+* locked onko vhost lukossa, vain admin voi muuttaa
+* t_domains_id domainin id ( vain luku ) 
+* t_services_id vhostia palvelevan palvelimen t_services_id
+* disabled Vhosti poissa käytöstä
 
-=== t_change_log ===
-* Taulu, joka sisältää tiedot tietokantaan tehdyistä muutoksista
 
 === user_ports ===
 * Viewi, missä käyttäjä näkee omat porttinsa.
@@ -100,8 +144,7 @@ Dokumentaatio tietokannoista
 * View sisältää tiedon asiakkaasta ja tämän aliaksista
 * ks. t_customers
 
-
-
-=== services.change_log
+=== services.change_log === 
 * View, joka on vähän laajennettu näkymä t_change_log:sta
+* Tarkoitettu renkisrv:n käyttöön.
 

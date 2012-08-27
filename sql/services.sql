@@ -14,7 +14,8 @@ CREATE TABLE services.t_service_types
 CREATE TABLE services.t_services
 (
     t_services_id serial NOT NULL PRIMARY KEY,
-    t_addresses_id integer references t_addresses,
+    t_addresses_id integer references t_addresses NOT NULL,
+    t_v6addresses_id integer references t_addresses,
     service_type text references t_service_types (service_type) NOT NULL,
     t_domains_id integer references t_domains NOT NULL,
     info text,
@@ -40,7 +41,7 @@ insert into t_service_types (service_category, service_type) VALUES ('VHOST','WO
 insert into t_service_types (service_category, service_type) VALUES ('SHELL','USER_PORT');
 insert into t_service_types (service_category, service_type) VALUES ('SHELL','SHELL');
 insert into t_service_types (service_category, service_type) VALUES ('OTHER','JABBER');
-
+insert into t_service_types (service_type, service_category) VALUES ('DNS', 'DNS');
 
 ----------------
 -- User ports --

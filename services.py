@@ -2,6 +2,7 @@
 
 from sqlalchemy import *
 from sqlalchemy.dialects.postgresql import *
+from sqlalchemy.engine.url import URL
 from sqlalchemy import event
 from sqlalchemy.pool import Pool
 from sqlalchemy.orm import mapper, sessionmaker, relationship, clear_mappers
@@ -108,8 +109,8 @@ class Services(object):
             port = self.database_port
         if not port:
             port = 5432
-        self.db = create_engine('postgresql://%s:%s@%s:%s/%s' % (user, password, server, port, database),
-                                encoding='utf-8', echo=self.verbose, pool_recycle=60)
+        self.db = create_engine(URL('postgresql', username=user, password=password, host=server, port=port, database=database),
+                encoding='utf-8', echo=self.verbose, pool_recycle=60)
 
     def map_objects(self):
         """Function to get session"""

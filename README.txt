@@ -5,8 +5,22 @@ Services have tree sections
 - Clients like Renki and renkiadm
 - Servers like Renkisrv
 
-Before usage
-- replace default hostmaster addresses on database.sql to something else
+Getting started:
+- create database named services to postgresql
+- run sql/create_database.sh script
+- create admin user account with group admins
+- create normal user account with group users
+
+- use admin user to create first customer 
+ - customer number 0 is for your company
+
+- create first domain with t_customers_id 0 and t_domain_id 0
+- create user with t_domains_id = 0
+
+- add some networks to t_subnets table
+- add some addresses to t_addresses table using resently created subnets
+
+- add services to t_services table (eg vhost servers)
 
 Services is licensed under MIT-license
 

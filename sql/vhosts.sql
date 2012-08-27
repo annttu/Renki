@@ -8,7 +8,7 @@ CREATE TABLE services.t_vhosts
     t_vhosts_id serial not null PRIMARY KEY,
     t_users_id integer REFERENCES t_users NOT NULL,
     parent_id integer REFERENCES t_vhosts,
-    t_services_id integer REFERENCES t_services,
+    t_services_id integer REFERENCES t_services NOT NULL,
     name text not null,
     created timestamptz default now(),
     t_domains_id integer not null REFERENCES t_domains,
@@ -16,6 +16,7 @@ CREATE TABLE services.t_vhosts
     logaccess boolean default false not null,
     redirect_to text default null,
     locked boolean default false not null,
+    disabled boolean DEFAULT FALSE NOT NULL,
     document_root text,
     CONSTRAINT valid_redirect CHECK (
         (
@@ -65,7 +66,8 @@ t_vhosts.redirect_to,
 t_vhosts.logaccess,
 t_vhosts.locked,
 t_dom.t_domains_id,
-t_vhosts.t_services_id
+t_vhosts.t_services_id,
+t_vhosts.disabled
 FROM services.t_vhosts
 JOIN services.t_domains as t_dom ON (t_vhosts.t_domains_id = t_dom.t_domains_id)
 JOIN services.t_users ON (t_users.t_users_id = t_vhosts.t_users_id)
@@ -135,14 +137,15 @@ AS ON INSERT TO public.vhosts
 DO INSTEAD
 (
 INSERT INTO t_vhosts
-(t_users_id, name, t_domains_id, redirect_to,logaccess,locked, t_services_id)
+(t_users_id, name, t_domains_id, redirect_to,logaccess,locked, t_services_id, disabled)
 SELECT users.t_users_id,
 find_vhost(NEW.name),
 find_domain(NEW.name),
 NEW.redirect_to,
 (public.is_admin() AND NEW.logaccess),
 (public.is_admin() AND NEW.locked),
-select_vhost_server(NEW.name, NEW.t_services_id)
+select_vhost_server(NEW.name, NEW.t_services_id),
+NEW.disabled
 FROM users
 JOIN services.t_customers USING (t_customers_id)
 WHERE (
@@ -164,10 +167,13 @@ AND (
     AND vhosts.username = users.name
 ) < 50
 -- don't insert without aliases
-RETURNING t_vhosts_id, (SELECT users.t_customers_id FROM users WHERE users.t_users_id = t_vhosts.t_users_id) AS t_customers_id,
+RETURNING t_vhosts_id, (SELECT users.t_customers_id FROM users
+WHERE users.t_users_id = t_vhosts.t_users_id) AS t_customers_id,
 (SELECT users.name from users WHERE users.t_users_id = t_vhosts.t_users_id), t_vhosts.t_users_id,
-    t_vhosts.created, (SELECT vhostdomaincat(t_vhosts.name, domains.name) FROM domains WHERE domains.t_domains_id = t_vhosts.t_domains_id),
-    ARRAY[]::text[], ARRAY[]::text[], t_vhosts.redirect_to, t_vhosts.logaccess,t_vhosts.locked,t_vhosts.t_domains_id,t_vhosts.t_services_id;
+    t_vhosts.created, (SELECT vhostdomaincat(t_vhosts.name, domains.name) FROM domains 
+    WHERE domains.t_domains_id = t_vhosts.t_domains_id),
+    ARRAY[]::text[], ARRAY[]::text[], t_vhosts.redirect_to, t_vhosts.logaccess,
+    t_vhosts.locked,t_vhosts.t_domains_id,t_vhosts.t_services_id,t_vhosts.disabled;
 -- add aliases also
 INSERT INTO t_vhosts (t_users_id, t_domains_id, name, parent_id, t_services_id)
 SELECT users.t_users_id,
@@ -232,16 +238,22 @@ DO INSTEAD
 SET
 redirect_to = NEW.redirect_to,
 logaccess = (public.is_admin() AND NEW.logaccess),
-locked = (public.is_admin() AND NEW.locked)
+locked = (public.is_admin() AND NEW.locked),
+disabled = NEW.disabled
 FROM services.t_customers, users
 WHERE t_vhosts.t_vhosts_id = new.t_vhosts_id
 AND old.t_users_id = users.t_users_id
 AND t_customers.t_customers_id = users.t_customers_id
-AND ((users.name = CURRENT_USER  AND NOT public.is_admin()) OR (public.is_admin() AND users.t_users_id = OLD.t_users_id))
-RETURNING t_vhosts_id, (SELECT users.t_customers_id FROM users WHERE users.t_users_id = t_vhosts.t_users_id) AS t_customers_id,
-(SELECT users.name from users WHERE users.t_users_id = t_vhosts.t_users_id), t_vhosts.t_users_id,
-    t_vhosts.created, (SELECT vhostdomaincat(t_vhosts.name, domains.name) FROM domains WHERE domains.t_domains_id = t_vhosts.t_domains_id),
-    ARRAY[]::text[], ARRAY[]::text[], t_vhosts.redirect_to, t_vhosts.logaccess,t_vhosts.locked,t_vhosts.t_domains_id,t_vhosts.t_services_id;
+AND ((users.name = CURRENT_USER  AND NOT public.is_admin()) 
+    OR (public.is_admin() AND users.t_users_id = OLD.t_users_id))
+RETURNING t_vhosts_id, (SELECT users.t_customers_id FROM users
+    WHERE users.t_users_id = t_vhosts.t_users_id) AS t_customers_id,
+(SELECT users.name from users WHERE users.t_users_id = t_vhosts.t_users_id),
+    t_vhosts.t_users_id, t_vhosts.created, 
+    (SELECT vhostdomaincat(t_vhosts.name, domains.name) FROM domains
+    WHERE domains.t_domains_id = t_vhosts.t_domains_id),
+    ARRAY[]::text[], ARRAY[]::text[], t_vhosts.redirect_to, t_vhosts.logaccess,
+    t_vhosts.locked,t_vhosts.t_domains_id,t_vhosts.t_services_id,t_vhosts.disabled;
 -- delete removed alias row from t_vhost_aliases table
 DELETE FROM services.t_vhosts
 WHERE parent_id = old.t_vhosts_id

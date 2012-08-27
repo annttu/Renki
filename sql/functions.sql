@@ -59,7 +59,8 @@ DECLARE
     retval text;
 BEGIN
     FOR retval IN SELECT a.a FROM (SELECT unnest(first::text[]) as a) as a
-               LEFT JOIN (select a from unnest(second::text[]) as a) as b using(a) WHERE b.a is null AND a.a IS NOT NULL LOOP
+               LEFT JOIN (select a from unnest(second::text[]) as a) as b using(a)
+               WHERE b.a is null AND a.a IS NOT NULL LOOP
                RETURN NEXT retval;
     END LOOP;
     RETURN;
@@ -574,7 +575,9 @@ BEGIN
         pk := c.column_name
           FROM information_schema.table_constraints tc
           JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
-          JOIN information_schema.columns AS c ON c.table_schema = tc.constraint_schema AND tc.table_name = c.table_name AND ccu.column_name = c.column_name
+          JOIN information_schema.columns AS c ON c.table_schema = tc.constraint_schema 
+          AND tc.table_name = c.table_name
+          AND ccu.column_name = c.column_name
           WHERE constraint_type = 'PRIMARY KEY' and tc.table_name = tablename
           AND tc.constraint_schema = tableschema
           LIMIT 1;
@@ -582,7 +585,9 @@ BEGIN
         pk := c.column_name
           FROM information_schema.table_constraints tc
           JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
-          JOIN information_schema.columns AS c ON c.table_schema = tc.constraint_schema AND tc.table_name = c.table_name AND ccu.column_name = c.column_name
+          JOIN information_schema.columns AS c ON c.table_schema = tc.constraint_schema 
+          AND tc.table_name = c.table_name
+          AND ccu.column_name = c.column_name
           WHERE constraint_type = 'PRIMARY KEY' and tc.table_name = tablename LIMIT 1;
     END IF;
     IF pk IS NULL THEN
@@ -742,18 +747,28 @@ DECLARE
     ip6 text;
 BEGIN
     IF (TG_OP = 'INSERT') THEN
-        ip4 := services.t_addresses.ip_address::text FROM services.t_services JOIN services.t_addresses USING (t_addresses_id) WHERE t_services.t_services_id = NEW.t_services_id;
-        ip6 := services.t_addresses.ip6_address::text FROM services.t_services JOIN services.t_addresses USING (t_addresses_id) WHERE t_services.t_services_id = NEW.t_services_id;
+        IF (NEW.t_services_id IS NULL) THEN
+            RAISE EXCEPTION 't_services_id is null';
+        END IF;
+        ip4 := services.t_addresses.ip_address::text FROM services.t_services 
+                JOIN services.t_addresses USING (t_addresses_id) 
+                WHERE t_services.t_services_id = NEW.t_services_id;
+        ip6 := services.t_addresses.ip_address::text FROM services.t_services 
+                JOIN services.t_addresses ON (t_addresses.t_addresses_id = t_services.t_v6addresses_id) 
+                WHERE t_services.t_services_id = NEW.t_services_id;
         EXECUTE 'INSERT INTO services.t_dns_entries
-        (type, key, value, t_domains_id)
-        VALUES ($t$A$t$, $t$' || NEW.name || '$t$, $t$' || ip4 || '$t$,$t$' || NEW.t_domains_id || '$t$)';
+        (type, key, value, t_domains_id, info)
+        VALUES ($t$A$t$, $t$' || NEW.name || '$t$, $t$' || ip4 || '$t$,$t$' || NEW.t_domains_id || '$t$, $t$t_vhost ' || NEW.t_vhosts_id || '$t$)';
         IF (ip6 IS NOT NULL) THEN
             EXECUTE 'INSERT INTO t_dns_entries
-            (type, key, value, t_domains_id)
-            VALUES ($t$AAAA$t$, $t$' || NEW.name || '$t$, $t$' || ip6 || '$t$,$t$' || NEW.t_domains_id || '$t$)';
+            (type, key, value, t_domains_id, info)
+            VALUES ($t$AAAA$t$, $t$' || NEW.name || '$t$, $t$' || ip6 || '$t$,$t$' || NEW.t_domains_id || '$t$, $t$t_vhost ' || NEW.t_vhosts_id || '$t$)';
         END IF;
         RETURN NEW;
     ELSIF (TG_OP = 'UPDATE') THEN
+        IF (NEW.t_services_id IS NULL) THEN
+            RAISE EXCEPTION 't_services_id is null';
+        END IF;
         ip4 := services.t_addresses.ip_address::text 
                 FROM services.t_services 
                 JOIN services.t_addresses USING (t_addresses_id) 
@@ -767,12 +782,12 @@ BEGIN
         AND key = $t$' || OLD.name || '$t$
         AND ( TYPE = $t$A$t$ OR type = $t$AAAA$t$ )';
         EXECUTE 'INSERT INTO services.t_dns_entries
-        (type, key, value, t_domains_id)
-        VALUES ($t$A$t$, $t$' || NEW.name || '$t$, $t$' || ip4 || '$t$,$t$' || NEW.t_domains_id || '$t$)';
+        (type, key, value, t_domains_id, info)
+        VALUES ($t$A$t$, $t$' || NEW.name || '$t$, $t$' || ip4 || '$t$,$t$' || NEW.t_domains_id || '$t$, $t$t_vhost ' || NEW.t_vhosts_id || '$t$)';
         IF (ip6 IS NOT NULL) THEN
             EXECUTE 'INSERT INTO t_dns_entries
-            (type, key, value, t_domains_id)
-            VALUES ($t$AAAA$t$, $t$' || NEW.name || '$t$, $t$' || ip6 || '$t$,$t$' || NEW.t_domains_id || '$t$)';
+            (type, key, value, t_domains_id, info)
+            VALUES ($t$AAAA$t$, $t$' || NEW.name || '$t$, $t$' || ip6 || '$t$,$t$' || NEW.t_domains_id || '$t$, $t$t_vhost ' || NEW.t_vhosts_id || '$t$)';
         END IF;
         RETURN NEW;
     ELSIF (TG_OP = 'DELETE') THEN

@@ -53,7 +53,7 @@ SELECT services.create_log_triggers('services.t_customers'::text);
 CREATE TABLE services.t_aliases
 (
     t_aliases_id serial NOT NULL PRIMARY KEY,
-    t_customers_id integer references t_customers NOT NULL,
+    t_customers_id integer references services.t_customers NOT NULL,
     alias text NOT NULL UNIQUE
 );
 
@@ -69,7 +69,7 @@ CREATE TABLE services.t_domains (
     t_domains_id serial NOT NULL PRIMARY KEY,
     name text UNIQUE NOT NULL,
     shared boolean DEFAULT false NOT NULL,
-    t_customers_id integer,
+    t_customers_id integer REFERENCES services.t_customers NOT NULL,
     dns boolean DEFAULT true NOT NULL,
     created timestamp with time zone DEFAULT now() NOT NULL,
     updated timestamp with time zone DEFAULT now(),
@@ -86,7 +86,7 @@ CREATE TABLE services.t_domains (
 
 SELECT services.create_log_triggers('services.t_domains'::text);
 
-ALTER TABLE t_domains ADD CONSTRAINT "domains_check" CHECK (
+ALTER TABLE servicest_domains ADD CONSTRAINT "domains_check" CHECK (
     refresh_time >= 1
     AND refresh_time <= 9999999
     AND retry_time >= 1
@@ -98,7 +98,7 @@ ALTER TABLE t_domains ADD CONSTRAINT "domains_check" CHECK (
     AND ttl >= 1
     AND ttl <= 9999999);
 
-ALTER TABLE t_domains ADD CONSTRAINT "valid_admin_address" CHECK (
+ALTER TABLE services.t_domains ADD CONSTRAINT "valid_admin_address" CHECK (
     admin_address ~ '^[^@\s]+@[^@\s]+(\.[^@\s]+)+$');
 
 
@@ -127,7 +127,7 @@ SELECT services.create_log_triggers('services.t_dns_keys'::text);
 
 CREATE TABLE services.t_users (
     t_users_id serial NOT NULL PRIMARY KEY,
-    t_customers_id integer NOT NULL REFERENCES t_customers,
+    t_customers_id integer NOT NULL REFERENCES services.t_customers,
     created timestamp with time zone DEFAULT now() NOT NULL,
     name text NOT NULL UNIQUE,
     lastname text,
@@ -269,7 +269,8 @@ CREATE TABLE services.t_dns_entries
     key text NOT NULL,
     value text NOT NULL,
     manual boolean NOT NULL default FALSE,
-    t_domains_id integer references services.t_domains
+    t_domains_id integer references services.t_domains NOT NULL,
+    info text
 );
 
 SELECT services.create_log_triggers('services.t_dns_entries'::text);

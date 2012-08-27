@@ -231,7 +231,7 @@ CREATE OR REPLACE VIEW services.s_user_ports
 AS
 SELECT t_user_ports.t_user_ports_id, t_user_ports.t_users_id, t_user_ports.port, t_user_ports.info, t_user_ports.t_services_id,
 t_user_ports.approved, t_user_ports.active, t_users.name, t_users.t_customers_id, t_users.unix_id,
-(t_addresses.name || '.'::text) || t_domains.name AS server, t_addresses.t_hosts_id as t_hosts_id
+(t_addresses.name || '.'::text) || t_domains.name AS server, t_addresses.t_hosts_id as t_hosts_id, t_users.name as username
 FROM services.t_user_ports
 JOIN services.t_users USING (t_users_id)
 JOIN services.t_customers ON t_users.t_customers_id = t_customers.t_customers_id
@@ -320,3 +320,17 @@ AFTER INSERT
 ON t_user_ports
 FOR EACH ROW
 EXECUTE PROCEDURE t_user_ports_historize_s_user_ports_trigger();
+
+
+CREATE OR REPLACE VIEW services.s_services AS
+SELECT t_services.t_services_id, t_services.service_type, t_services.info, 
+t_services.active, t_services.public, t_addresses.ip_address,
+vhostdomaincat(t_addresses.name, t_domains.name) as address, t_addresses6.ip_address as ip6_address
+FROM t_services
+LEFT JOIN t_addresses ON (t_services.t_addresses_id = t_addresses.t_addresses_id)
+LEFT JOIN t_addresses AS t_addresses6 ON (t_services.t_v6addresses_id = t_addresses6.t_addresses_id)
+JOIN t_domains ON (t_addresses.t_domains_id = t_domains.t_domains_id)
+WHERE t_services.active = TRUE;
+
+GRANT SELECT ON services.s_services TO admins;
+GRANT SELECT ON services.s_services TO servers;
