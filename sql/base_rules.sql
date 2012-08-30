@@ -21,7 +21,7 @@ CREATE TYPE t_change_log_event_type AS ENUM ('INSERT', 'UPDATE', 'DELETE');
 CREATE type domain_type AS enum ('MASTER', 'SLAVE', 'NONE');
 CREATE TYPE event_type AS ENUM ('INSERT','UPDATE', 'DELETE');
 CREATE TYPE t_hosts_type AS ENUM ('HARDWARE', 'VIRTUAL');
-CREATE TYPE t_dns_entries_type AS ENUM(
+CREATE TYPE t_dns_records_type AS ENUM(
     'A','AAAA','MX','NS','TXT','CNAME',
     'DNSKEY', 'PTR', 'SPF', 'SRV',
     'SSHFP', 'TSIG', 'TLSA', 'TKEY', 'TA',

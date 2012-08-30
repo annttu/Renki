@@ -420,26 +420,24 @@ DECLARE
     oldcols text;
     cols text;
     col RECORD;
-    ttype text;
+    schema text;
 BEGIN
 IF tablename IS NULL OR tablename = '' THEN
     RAISE EXCEPTION 'No table name given';
 ELSE
     oldcols := '';
     cols := '';
-    ttype := c.relname FROM pg_catalog.pg_class c
+    schema := n.nspname FROM pg_catalog.pg_class c
             LEFT JOIN pg_catalog.pg_user u ON u.usesysid = c.relowner
             LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-            WHERE c.relkind IN ('r','')
+            WHERE c.relkind IN ('r','','v')
             AND n.nspname NOT IN ('pg_catalog', 'pg_toast')
             AND pg_catalog.pg_table_is_visible(c.oid)
             AND c.relname = tablename;
     historytable := tablename || '_history';
-    EXECUTE 'DROP RULE IF EXISTS ' || tablename || '_delete_historize ON ' || tablename;
-    EXECUTE 'DROP RULE IF EXISTS ' || tablename || '_update_historize ON ' || tablename;
-    EXECUTE 'DROP FUNCTION IF EXISTS ' || tablename || '_historize(text, text)';
-    EXECUTE 'DROP TABLE IF EXISTS ' || historytable;
-    EXECUTE 'CREATE TABLE ' || historytable || ' (' || historytable || '_id serial PRIMARY KEY,
+    EXECUTE 'DROP FUNCTION IF EXISTS ' || schema || '.' || tablename || '_historize(text, text)';
+    EXECUTE 'DROP TABLE IF EXISTS ' || schema || '.' || historytable;
+    EXECUTE 'CREATE TABLE ' || schema || '.' || historytable || ' (' || historytable || '_id serial PRIMARY KEY,
             historized timestamptz DEFAULT NOW(), operation event_type,
             old_xmin integer default 0, old_xmax integer default 0)';
     FOR col IN
@@ -458,7 +456,7 @@ ELSE
               AND a.atttypid = t.oid
               ORDER BY a.attnum
         LOOP
-            EXECUTE 'ALTER TABLE ' || historytable || ' ADD COLUMN ' || col.field || ' ' || col.type;
+            EXECUTE 'ALTER TABLE ' || schema || '.' || historytable || ' ADD COLUMN ' || col.field || ' ' || col.type;
             IF oldcols = '' THEN
                 oldcols := 'OLD.' || col.field;
                 cols := col.field;
@@ -467,27 +465,90 @@ ELSE
                 cols := cols || ', ' || col.field;
             END IF;
         END LOOP;
-        IF ttype = 't' THEN
-            EXECUTE 'CREATE RULE ' || tablename || '_delete_historize AS ON DELETE TO ' || tablename || ' DO ALSO
-                INSERT INTO ' || historytable || ' ( operation, old_xmax, old_xmin, ' || cols || ' ) SELECT
+    END IF;
+END;
+$$ LANGUAGE plpgsql
+VOLATILE;
+
+-- historize triggers
+CREATE OR REPLACE FUNCTION services.create_history_triggers(tablename text)
+RETURNS VOID
+AS $$
+DECLARE
+    historytable text;
+    oldcols text;
+    cols text;
+    col RECORD;
+    ttype text;
+    schema text;
+BEGIN
+IF tablename IS NULL OR tablename = '' THEN
+    RAISE EXCEPTION 'No table name given';
+ELSE
+    oldcols := '';
+    cols := '';
+    ttype := c.relkind FROM pg_catalog.pg_class c
+            LEFT JOIN pg_catalog.pg_user u ON u.usesysid = c.relowner
+            LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+            WHERE c.relkind IN ('r','','v')
+            AND n.nspname NOT IN ('pg_catalog', 'pg_toast')
+            AND pg_catalog.pg_table_is_visible(c.oid)
+            AND c.relname = tablename;
+    schema := n.nspname FROM pg_catalog.pg_class c
+            LEFT JOIN pg_catalog.pg_user u ON u.usesysid = c.relowner
+            LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+            WHERE c.relkind IN ('r','')
+            AND n.nspname NOT IN ('pg_catalog', 'pg_toast')
+            AND pg_catalog.pg_table_is_visible(c.oid)
+            AND c.relname = tablename;
+    historytable := tablename || '_history';
+    EXECUTE 'DROP RULE IF EXISTS ' || tablename || '_delete_historize ON ' || schema || '.' || tablename;
+    EXECUTE 'DROP RULE IF EXISTS ' || tablename || '_update_historize ON ' || schema || '.' || tablename;
+    FOR col IN
+            SELECT
+              a.attnum,
+              a.attname AS field,
+              t.typname AS type
+            FROM
+              pg_class c,
+              pg_attribute a,
+              pg_type t
+            WHERE
+              c.relname = tablename
+              AND a.attnum > 0
+              AND a.attrelid = c.oid
+              AND a.atttypid = t.oid
+              ORDER BY a.attnum
+        LOOP
+            IF oldcols = '' THEN
+                oldcols := 'OLD.' || col.field;
+                cols := col.field;
+            ELSE
+                oldcols := oldcols || ', OLD.' || col.field;
+                cols := cols || ', ' || col.field;
+            END IF;
+        END LOOP;
+        IF ttype = 'r' THEN
+            EXECUTE 'CREATE RULE ' || tablename || '_delete_historize AS ON DELETE TO ' || schema || '.' || tablename || ' DO ALSO
+                INSERT INTO ' || schema || '.' || historytable || ' ( operation, old_xmax, old_xmin, ' || cols || ' ) SELECT
                 ' || quote_literal('DELETE') || ', cast(txid_current() as text)::integer,
                 cast(OLD.xmin as text)::integer, ' || oldcols;
-            EXECUTE 'CREATE RULE ' || tablename || '_update_historize AS ON UPDATE TO ' || tablename || ' DO ALSO
-                INSERT INTO ' || historytable || ' ( operation, old_xmax, old_xmin, ' || cols || ' ) SELECT
+            EXECUTE 'CREATE RULE ' || tablename || '_update_historize AS ON UPDATE TO ' || schema || '.' || tablename || ' DO ALSO
+                INSERT INTO ' || schema || '.' || historytable || ' ( operation, old_xmax, old_xmin, ' || cols || ' ) SELECT
                 ' || quote_literal('UPDATE') || ', cast(txid_current() as text)::integer,
                 cast(OLD.xmin as text)::integer, ' || oldcols;
         ELSIF ttype = 'v' THEN
-            EXECUTE 'CREATE RULE ' || tablename || '_delete_historize AS ON DELETE TO ' || tablename || ' DO ALSO
-                INSERT INTO ' || historytable || ' ( operation, old_xmax, ' || cols || ' ) SELECT
+            EXECUTE 'CREATE RULE ' || tablename || '_delete_historize AS ON DELETE TO ' || schema || '.' || tablename || ' DO ALSO
+                INSERT INTO ' || schema || '.' || historytable || ' ( operation, old_xmax, ' || cols || ' ) SELECT
                 ' || quote_literal('UPDATE') || ', cast(txid_current() as text)::integer, ' || oldcols;
-            EXECUTE 'CREATE RULE ' || tablename || '_update_historize AS ON UPDATE TO ' || tablename || ' DO ALSO
-                INSERT INTO ' || historytable || ' ( operation, old_xmax, ' || cols || ' ) SELECT
+            EXECUTE 'CREATE RULE ' || tablename || '_update_historize AS ON UPDATE TO ' || schema || '.' || tablename || ' DO ALSO
+                INSERT INTO ' || schema || '.' || historytable || ' ( operation, old_xmax, ' || cols || ' ) SELECT
                 ' || quote_literal('UPDATE') || ', cast(txid_current() as text)::integer, ' || oldcols;
         END IF;
     END IF;
 END;
 $$ LANGUAGE plpgsql
-STABLE;
+VOLATILE;
 
 -- historize view function creates trigger to table
 -- on update or delete to view, copy related tables rows to histrory tables
@@ -575,7 +636,7 @@ BEGIN
         pk := c.column_name
           FROM information_schema.table_constraints tc
           JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
-          JOIN information_schema.columns AS c ON c.table_schema = tc.constraint_schema 
+          JOIN information_schema.columns AS c ON c.table_schema = tc.constraint_schema
           AND tc.table_name = c.table_name
           AND ccu.column_name = c.column_name
           WHERE constraint_type = 'PRIMARY KEY' and tc.table_name = tablename
@@ -585,7 +646,7 @@ BEGIN
         pk := c.column_name
           FROM information_schema.table_constraints tc
           JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
-          JOIN information_schema.columns AS c ON c.table_schema = tc.constraint_schema 
+          JOIN information_schema.columns AS c ON c.table_schema = tc.constraint_schema
           AND tc.table_name = c.table_name
           AND ccu.column_name = c.column_name
           WHERE constraint_type = 'PRIMARY KEY' and tc.table_name = tablename LIMIT 1;
@@ -738,7 +799,7 @@ STABLE;
 GRANT EXECUTE ON FUNCTION public.valid_database_name(text) TO users;
 GRANT EXECUTE ON FUNCTION public.valid_database_name(text) TO admins;
 
-CREATE OR REPLACE FUNCTION public.add_vhost_dns_entries()
+CREATE OR REPLACE FUNCTION public.vhost_dns_records()
 RETURNS TRIGGER
 AS
 $$
@@ -756,13 +817,17 @@ BEGIN
         ip6 := services.t_addresses.ip_address::text FROM services.t_services 
                 JOIN services.t_addresses ON (t_addresses.t_addresses_id = t_services.t_v6addresses_id) 
                 WHERE t_services.t_services_id = NEW.t_services_id;
-        EXECUTE 'INSERT INTO services.t_dns_entries
-        (type, key, value, t_domains_id, info)
-        VALUES ($t$A$t$, $t$' || NEW.name || '$t$, $t$' || ip4 || '$t$,$t$' || NEW.t_domains_id || '$t$, $t$t_vhost ' || NEW.t_vhosts_id || '$t$)';
+        EXECUTE 'INSERT INTO services.t_dns_records
+        (type, key, value, t_domains_id, info, manual)
+        VALUES ($t$A$t$, $t$' || NEW.name || '$t$, $t$' || ip4 || '$t$,
+            $t$' || NEW.t_domains_id || '$t$,
+            $t$t_vhost ' || NEW.t_vhosts_id || '$t$, FALSE)';
         IF (ip6 IS NOT NULL) THEN
-            EXECUTE 'INSERT INTO t_dns_entries
-            (type, key, value, t_domains_id, info)
-            VALUES ($t$AAAA$t$, $t$' || NEW.name || '$t$, $t$' || ip6 || '$t$,$t$' || NEW.t_domains_id || '$t$, $t$t_vhost ' || NEW.t_vhosts_id || '$t$)';
+            EXECUTE 'INSERT INTO services.t_dns_records
+            (type, key, value, t_domains_id, info, manual)
+            VALUES ($t$AAAA$t$, $t$' || NEW.name || '$t$, $t$' || ip6 || '$t$,
+            $t$' || NEW.t_domains_id || '$t$,
+            $t$t_vhost ' || NEW.t_vhosts_id || '$t$, FALSE)';
         END IF;
         RETURN NEW;
     ELSIF (TG_OP = 'UPDATE') THEN
@@ -777,21 +842,26 @@ BEGIN
                 FROM services.t_services
                 JOIN services.t_addresses USING (t_addresses_id)
                 WHERE services.t_services.t_services_id = NEW.t_services_id;
-        EXECUTE 'DELETE FROM services.t_dns_entries
+        EXECUTE 'DELETE FROM services.t_dns_records
         WHERE t_domains_id = $t$' || OLD.t_domains_id || '$t$
         AND key = $t$' || OLD.name || '$t$
         AND ( TYPE = $t$A$t$ OR type = $t$AAAA$t$ )';
-        EXECUTE 'INSERT INTO services.t_dns_entries
-        (type, key, value, t_domains_id, info)
-        VALUES ($t$A$t$, $t$' || NEW.name || '$t$, $t$' || ip4 || '$t$,$t$' || NEW.t_domains_id || '$t$, $t$t_vhost ' || NEW.t_vhosts_id || '$t$)';
+        EXECUTE 'INSERT INTO services.t_dns_records
+        (type, key, value, t_domains_id, info, manual)
+        VALUES ($t$A$t$, $t$' || NEW.name || '$t$, $t$' || ip4 || '$t$,
+                $t$' || NEW.t_domains_id || '$t$,
+                $t$t_vhost ' || NEW.t_vhosts_id || '$t$,
+                FALSE)';
         IF (ip6 IS NOT NULL) THEN
-            EXECUTE 'INSERT INTO t_dns_entries
-            (type, key, value, t_domains_id, info)
-            VALUES ($t$AAAA$t$, $t$' || NEW.name || '$t$, $t$' || ip6 || '$t$,$t$' || NEW.t_domains_id || '$t$, $t$t_vhost ' || NEW.t_vhosts_id || '$t$)';
+            EXECUTE 'INSERT INTO services.t_dns_records
+            (type, key, value, t_domains_id, info, manual)
+            VALUES ($t$AAAA$t$, $t$' || NEW.name || '$t$, $t$' || ip6 || '$t$,
+            $t$' || NEW.t_domains_id || '$t$,
+            $t$t_vhost ' || NEW.t_vhosts_id || '$t$, FALSE)';
         END IF;
         RETURN NEW;
     ELSIF (TG_OP = 'DELETE') THEN
-        EXECUTE 'DELETE FROM services.t_dns_entries
+        EXECUTE 'DELETE FROM services.t_dns_records
         WHERE t_domains_id = $t$' || OLD.t_domains_id || '$t$
         AND key = $t$' || OLD.name || '$t$
         AND ( TYPE = $t$A$t$ OR type = $t$AAAA$t$ )';
@@ -800,9 +870,11 @@ BEGIN
 END;
 $$
 LANGUAGE plpgsql
-VOLATILE;
+VOLATILE
+SECURITY DEFINER;
 
 
+-- Kapsi specific function, ignore this
 
 CREATE OR REPLACE FUNCTION public.select_vhost_server(vhost text, services_id integer)
 RETURNS INTEGER
@@ -814,16 +886,382 @@ DECLARE
 BEGIN
     domain := find_domain(vhost);
     IF (services_id IS NOT NULL) THEN
-        FOR serv IN SELECT vhost_servers.t_services_id from vhost_servers WHERE t_services_id = services_id LOOP
+        FOR serv IN SELECT services.t_services_id from services
+                    WHERE t_services_id = services_id
+                    AND service_type = 'VHOST'
+        LOOP
             RETURN serv;
         END LOOP;
     END IF;
     IF (domain = 'kapsi.fi') THEN
-        RETURN t_services_id FROM vhost_servers WHERE server = 'vhost-ssl.kapsi.fi';
+        RETURN services.t_services_id FROM public.services
+               WHERE server = 'vhost-ssl.kapsi.fi'
+               AND service_type = 'VHOST';
     ELSE
-        RETURN t_services_id FROM vhost_servers WHERE server = 'vhost.kapsi.fi';
+        RETURN services.t_services_id FROM public.services
+               WHERE server = 'vhost.kapsi.fi'
+               AND service_type = 'VHOST';
     END IF;
 END;
 $$
 language plpgsql
 STABLE;
+
+-- Checks if given string is reverse-dns address.
+
+CREATE OR REPLACE FUNCTION public.is_reverse_dns(address text)
+RETURNS BOOLEAN
+AS
+$t$
+BEGIN
+    IF (address IS NULL) THEN
+        RETURN FALSE;
+    END IF;
+    IF (address ~* '^([0-9][0-9]?[0-9]?\.)+in-addr.arpa.?$' OR address ~* '^([0-9]\.)+ip6.arpa.?$') THEN
+        RETURN TRUE;
+    END IF;
+    RETURN FALSE;
+END;
+$t$
+LANGUAGE plpgsql
+IMMUTABLE;
+
+-- Check if given string is inet
+-- Returns true if inet, else false
+
+CREATE OR REPLACE FUNCTION public.is_ip(address text)
+RETURNS BOOLEAN
+AS
+$t$
+DECLARE
+    a INET;
+BEGIN
+    a := INET(address);
+    RETURN TRUE;
+EXCEPTION WHEN OTHERS THEN
+    RETURN FALSE;
+END;
+$t$
+LANGUAGE plpgsql
+IMMUTABLE;
+
+
+-- Add ns and mx records to new domain.
+-- Note: bind don't allow new zones without nameservers
+-- mx servers not added if reverse-dns domain.
+
+CREATE OR REPLACE FUNCTION public.default_dns_records()
+RETURNS TRIGGER
+AS
+$t$
+DECLARE
+    ns_server text;
+    mx_server record;
+BEGIN
+    IF (TG_OP = 'INSERT') THEN
+        -- DNS RECORDS
+        IF (NEW.dns = FALSE) THEN
+            RETURN NEW;
+        END IF;
+        FOR ns_server IN SELECT services.server FROM services
+                         WHERE (services.service_type = 'DNS_MASTER' OR
+                                services.service_type = 'DNS_SLAVE') LOOP
+            EXECUTE 'INSERT INTO services.t_dns_records
+            (type, key, value, t_domains_id, info, manual)
+            VALUES ($$NS$$, $$@$$, $$' || ns_server || '.$$,
+            $$' || NEW.t_domains_id || '$$, $$default NS server$$, FALSE);';
+        END LOOP;
+        IF (is_reverse_dns(NEW.name) = FALSE) THEN
+            -- MX RECORDS
+            FOR mx_server IN SELECT services.server, services.priority FROM services
+                             WHERE services.service_type = 'MAIL' LOOP
+                    EXECUTE 'INSERT INTO services.t_dns_records
+                        (type, key, value, t_domains_id, info, manual)
+                        VALUES ($$MX$$, $$@$$,
+                        $$' || mx_server.priority || ' ' || mx_server.server || '.$$,
+                        $$' || NEW.t_domains_id || '$$, $$default MX server$$, FALSE);';
+            END LOOP;
+        END IF;
+        RETURN NEW;
+    ELSIF (TG_OP = 'UPDATE') THEN
+        -- ADD dns records if
+        IF (NEW.dns = TRUE AND OLD.dns = FALSE) THEN
+            FOR ns_server IN SELECT services.server FROM services
+                         WHERE (services.service_type = 'DNS_MASTER' OR
+                                services.service_type = 'DNS_SLAVE') LOOP
+                EXECUTE 'INSERT INTO services.t_dns_records
+                        (type, key, value, t_domains_id, info, manual)
+                        VALUES ($$NS$$, $$@$$, $$' || ns_server || '.$$,
+                        $$' || NEW.t_domains_id || '$$, $$default NS server$$, FALSE);';
+            END LOOP;
+            IF (is_reverse_dns(NEW.name) = FALSE) THEN
+                FOR mx_server IN SELECT services.server, services.priority FROM services
+                             WHERE services.service_type = 'MAIL' LOOP
+                    EXECUTE 'INSERT INTO services.t_dns_records
+                        (type, key, value, t_domains_id, info, manual)
+                        VALUES ($$MX$$, $$@$$,
+                        $$' || mx_server.priority || ' ' || mx_server.server || '.$$,
+                        $$' || NEW.t_domains_id || '$$, $$default MX server$$, FALSE);';
+                END LOOP;
+            END IF;
+        END IF;
+        RETURN NEW;
+    ELSIF (TG_OP = 'DELETE') THEN
+        -- Delete all this domain dns-entries
+        EXECUTE 'DELETE FROM services.t_dns_records
+                 WHERE t_domains_id = $$' || OLD.t_domains_id || '$$';
+        RETURN OLD;
+    END IF;
+END;
+$t$
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER;
+
+-- Validates t_dns_records rows
+-- Tests currently:
+-- MX record format is "integer address"
+-- CNAME and PTR value is dns-address, not ip
+-- A and AAAA record value is ip
+-- names ends with . or exists in t_dns_records
+-- TODO: More format checkers
+
+CREATE OR REPLACE FUNCTION public.valid_dns_record()
+RETURNS TRIGGER
+AS
+$t$
+DECLARE
+    row record;
+BEGIN
+    IF (TG_OP = 'UPDATE' OR TG_OP = 'INSERT') THEN
+        IF (NEW.key IS NULL OR NEW.key = '') THEN
+            NEW.key = '@';
+        END IF;
+        -- CHECK MX RECORD priority
+        IF (NEW.type = 'MX') THEN
+            IF (NEW.value !~* '^[0-9]+ ') THEN
+                RAISE EXCEPTION '% record must have integer property', NEW.type;
+            END IF;
+        END IF;
+        IF (public.is_ip(NEW.value)) THEN
+            IF (NEW.type = 'CNAME' OR NEW.type = 'PTR') THEN
+                RAISE EXCEPTION 'Value of % record cannot be ip-address', NEW.type;
+            END IF;
+            RETURN NEW;
+        ELSIF (NEW.type = 'A' OR NEW.type = 'AAAA') THEN
+            RAISE EXCEPTION 'Value of % record must be ip-address', NEW.type;
+        ELSE
+            -- Last charter must be . or value must be in table
+            IF (NEW.value ~* '\.$') THEN
+                RETURN NEW;
+            END IF;
+            FOR row IN SELECT t_dns_records_id FROM dns_records
+                       JOIN domains ON (domains.name = dns_records.domain)
+                       WHERE dns_records.key = NEW.value
+                       AND domains.t_domains_id = NEW.t_domains_id LOOP
+                RETURN NEW;
+            END LOOP;
+            RAISE EXCEPTION 'DNS-record is not valid';
+        END IF;
+    ELSIF (TG_OP = 'DELETE') THEN
+        RETURN OLD;
+    END IF;
+END;
+$t$
+LANGUAGE plpgsql
+IMMUTABLE;
+
+-- Create reverse address for given inet
+-- Used as a helper function with other funtions
+
+CREATE OR REPLACE FUNCTION public.reverse_address(addr inet)
+RETURNS text
+AS
+$t$
+DECLARE
+    mask integer;
+    parts text[];
+    part text;
+    newpart text;
+    retval text;
+    rounds integer;
+    host text;
+    m integer;
+BEGIN
+    retval := '';
+    rounds := 0;
+    mask := masklen(addr);
+    host := host(addr);
+    IF (family(addr) = 4) THEN
+        IF (mask < 8) THEN
+            rounds := 4;
+        ELSIF (mask < 16) THEN
+            rounds := 3;
+        ELSIF (mask < 24) THEN
+            rounds := 2;
+        ELSIF (mask < 32) THEN
+            rounds := 1;
+        END IF;
+        FOREACH part in ARRAY regexp_split_to_array(host, '\.') LOOP
+            rounds := rounds + 1;
+            IF (rounds <= 4) THEN
+                retval := part || '.' || retval;
+            END IF;
+        END LOOP;
+        RETURN retval || 'in-addr.arpa.';
+    ELSE
+        IF (host ~ '^:') THEN
+            host := '0' || host;
+        END IF;
+        parts := ARRAY[]::text[];
+        FOREACH part in ARRAY regexp_split_to_array(host, ':') LOOP
+            IF (part != '') THEN
+                parts := array_append(parts, part);
+            ELSE
+                m := 9 - COUNT(*) FROM unnest(regexp_split_to_array(host, ':'));
+                FOREACH m IN ARRAY array((SELECT generate_series(1, m))) LOOP
+                    parts := array_append(parts, '0');
+                END LOOP;
+            END IF;
+        END LOOP;
+        m := mask / 16;
+        FOREACH m IN ARRAY array((SELECT generate_series(1, m))) LOOP
+            part := parts[m];
+            m := 0;
+            newpart := '';
+            FOREACH part IN ARRAY regexp_matches(part, '(.)(.)?(.)?(.)?') LOOP
+                m := m + 1;
+                IF (newpart = '') THEN
+                    newpart := part;
+                ELSIF (part IS NULL) THEN
+                    newpart := newpart || '.' || '0';
+                ELSE
+                    newpart := part || '.' || newpart;
+                END IF;
+            END LOOP;
+            retval := newpart || '.' || retval;
+        END LOOP;
+        RETURN retval || 'ip6.arpa.';
+    END IF;
+END;
+$t$
+LANGUAGE 'plpgsql'
+IMMUTABLE;
+
+-- Used with t_addresses
+-- Adds and removes dns-records (A,AAAA,PTR) based on changes on t_addresses
+--
+CREATE OR REPLACE FUNCTION services.update_dns_records()
+RETURNS TRIGGER
+AS
+$t$
+DECLARE
+    ptr_domains_id integer;
+    domains_id integer;
+    ptr_domain text;
+    old_ptr_domains_id integer;
+    network inet;
+    old_network inet;
+    hostpart text;
+    old_hostpart text;
+BEGIN
+    IF (TG_OP = 'DELETE' OR TG_OP = 'UPDATE' ) THEN
+        old_network := address FROM t_subnets
+               WHERE t_subnets_id = OLD.t_subnets_id;
+        old_hostpart := replace(reverse_address(OLD.ip_address),
+                        '.' || reverse_address(old_network), '');
+        old_ptr_domains_id := t_domains_id FROM t_domains
+                    WHERE t_domains.name = reverse_address(old_network);
+    END IF;
+    IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE' ) THEN
+        network := address FROM t_subnets
+               WHERE t_subnets_id = NEW.t_subnets_id;
+        hostpart := replace(reverse_address(NEW.ip_address),
+                        '.' || reverse_address(network), '');
+        ptr_domains_id := t_domains_id FROM t_domains
+                    WHERE t_domains.name = reverse_address(network);
+        ptr_domain := name FROM t_domains
+                     WHERE t_domains.t_domains_id = NEW.t_domains_id;
+        RAISE NOTICE 'ptr_domain % ptr_domains_id % network % hostpart %',ptr_domain,ptr_domains_id,reverse_address(network::inet),hostpart;
+        IF (ptr_domains_id IS NULL) THEN
+            RAISE NOTICE 'Subnet reverse domain entry not exist, creating...';
+            EXECUTE 'INSERT INTO t_domains (name, t_customers_id, dns, shared)
+                     VALUES ($$' || reverse_address(network::inet) || '$$, 0, TRUE, FALSE)';
+            ptr_domains_id := t_domains_id FROM t_domains
+                        WHERE t_domains.name = reverse_address(network);
+        END IF;
+    END IF;
+
+    IF (TG_OP = 'INSERT') THEN
+        EXECUTE 'INSERT INTO t_dns_records (key, type, value, manual, t_domains_id)
+                 VALUES ($$' || hostpart || '$$, $$PTR$$,
+                 $$' || vhostdomaincat(NEW.name::text, ptr_domain::text) || '.$$, FALSE,
+                 $$' || ptr_domains_id || '$$)';
+        IF (family(NEW.ip_address) = 4) THEN
+            EXECUTE 'INSERT INTO t_dns_records (key, type, value, manual, t_domains_id)
+                     VALUES ($$' || NEW.name || '$$, $$A$$,
+                     $$' || NEW.ip_address || '$$, FALSE,
+                     $$' || NEW.t_domains_id || '$$)';
+        ELSE
+            EXECUTE 'INSERT INTO t_dns_records (key, type, value, manual, t_domains_id)
+                     VALUES ($$' || NEW.name || '$$, $$AAAA$$,
+                     $$' || NEW.ip_address || '$$, FALSE,
+                     $$' || NEW.t_domains_id || '$$)';
+        END IF;
+        RETURN NEW;
+    ELSIF (TG_OP = 'UPDATE') THEN
+        IF (NEW.name != OLD.name OR NEW.t_domains_id != OLD.t_domains_id
+            OR NEW.ip_address != OLD.ip_address) THEN
+            -- Delete old.
+            EXECUTE 'DELETE FROM t_dns_records
+                WHERE t_domains_id = $$' || old_ptr_domains_id || '$$
+                AND type = $$PTR$$ AND key = $$' || old_hostpart || '$$';
+            IF (family(NEW.ip_address) = 4) THEN
+                EXECUTE 'DELETE FROM t_dns_records
+                    WHERE t_domains_id = $$' || OLD.t_domains_id || '$$
+                    AND type = $$A$$ AND key = $$' || OLD.name || '$$';
+            ELSE
+                EXECUTE 'DELETE FROM t_dns_records
+                    WHERE t_domains_id = $$' || OLD.t_domains_id || '$$
+                    AND type = $$AAAA$$ AND key = $$' || OLD.name || '$$';
+            END IF;
+            -- Add new.
+            EXECUTE 'INSERT INTO t_dns_records (key, type, value, manual, t_domains_id)
+                 VALUES ($$' || hostpart || '$$, $$PTR$$,
+                 $$' || vhostdomaincat(NEW.name::text, ptr_domain::text) || '.$$, FALSE,
+                 $$' || ptr_domains_id || '$$)';
+            IF (family(NEW.ip_address) = 4) THEN
+                EXECUTE 'INSERT INTO t_dns_records (key, type, value, manual, t_domains_id)
+                     VALUES ($$' || NEW.name || '$$, $$A$$,
+                     $$' || NEW.ip_address || '$$, FALSE,
+                     $$' || NEW.t_domains_id || '$$)';
+            ELSE
+                EXECUTE 'INSERT INTO t_dns_records (key, type, value, manual, t_domains_id)
+                     VALUES ($$' || NEW.name || '$$, $$AAAA$$,
+                     $$' || NEW.ip_address || '$$, FALSE,
+                     $$' || NEW.t_domains_id || '$$)';
+            END IF;
+         END IF;
+        RETURN NEW;
+    ELSIF (TG_OP = 'DELETE') THEN
+        -- Delete old.
+        IF (old_ptr_domains_id IS NOT NULL AND old_hostpart IS NOT NULL) THEN
+            EXECUTE 'DELETE FROM t_dns_records
+                WHERE t_domains_id = $$' || old_ptr_domains_id || '$$
+                AND type = $$PTR$$ AND key = $$' || old_hostpart || '$$';
+            IF (family(OLD.ip_address) = 4) THEN
+                EXECUTE 'DELETE FROM t_dns_records
+                    WHERE t_domains_id = $$' || OLD.t_domains_id || '$$
+                    AND type = $$A$$ AND key = $$' || OLD.name || '$$';
+            ELSE
+                EXECUTE 'DELETE FROM t_dns_records
+                    WHERE t_domains_id = $$' || OLD.t_domains_id || '$$
+                    AND type = $$AAAA$$ AND key = $$' || OLD.name || '$$';
+            END IF;
+        END IF;
+        RETURN OLD;
+    END IF;
+END;
+$t$
+LANGUAGE plpgsql
+VOLATILE;

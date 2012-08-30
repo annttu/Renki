@@ -24,6 +24,7 @@ from libs.host import Hosts
 from libs.subnet import Subnets
 from exceptions import DatabaseError, DoesNotExist, PermissionDenied
 from libs.types import INETARRAY
+from sqlalchemy.dialects.postgresql import INET
 
 logging.basicConfig()
 logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
@@ -175,10 +176,21 @@ class Services(object):
                 'customer': relationship(self.Customers, backref='users'),
                 'domain': relationship(self.Domains, backref='users')
                 })
+        except OperationalError as e:
+            self.log.exception(e)
+        try:
+            services = Table('services', self.main.metadata,
+                            Column("t_services_id", Integer, primary_key=True),
+                            Column("server", String),
+                            Column("info", String),
+                            Column("priority", Integer),
+                            Column("service_type", String),
+                            Column('ip_address', INET),
+                            Column('ipv6_address', INET))
+            mapper(self.Services, services)
             return True
         except OperationalError as e:
             self.log.exception(e)
-
     def getSession(self):
         try:
             Session = sessionmaker(bind=self.db)
@@ -412,9 +424,9 @@ class Services(object):
         """Vhost redirect object
         object is mapped to the vhost_redirects view"""
 
-    class Vhost_servers(object):
+    class Services(object):
         """Vhost servers object
-        object is mapped to the vhost_servers view"""
+        object is mapped to the services view"""
 
     class Mailboxes(object):
         """Mailboxes object

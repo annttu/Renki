@@ -23,6 +23,27 @@ ALTER TABLE services.t_subnets ADD CONSTRAINT "valid mtu" CHECK (mtu >= 0 AND mt
 
 SELECT create_log_triggers('services.t_subnets'::text);
 
+DROP RULE t_subnets_add_ptr_domain ON services.t_subnets;
+CREATE RULE t_subnets_add_ptr_domain AS
+ON INSERT TO services.t_subnets
+DO ALSO
+INSERT INTO t_domains (name, t_customers_id, dns, shared)
+    VALUES (reverse_address(NEW.address), 0, TRUE, FALSE);
+
+DROP RULE t_subnets_update_ptr_domain ON services.t_subnets;
+CREATE RULE t_subnets_update_ptr_domain AS
+ON UPDATE TO services.t_subnets
+DO ALSO
+UPDATE t_domains SET name = reverse_address(NEW.address)
+WHERE name = reverse_address(OLD.address);
+
+DROP RULE t_subnets_delete_ptr_domain ON services.t_subnets;
+CREATE RULE t_subnets_delete_ptr_domain AS
+ON DELETE TO services.t_subnets
+DO ALSO
+DELETE FROM t_domains WHERE name = reverse_address(OLD.address);
+
+
 ------------------------------
 -- Hosts aka. computers etc --
 ------------------------------
@@ -42,9 +63,9 @@ ALTER TABLE services.t_hosts ADD UNIQUE (name, t_domains_id);
 
 SELECT services.create_log_triggers('t_hosts'::text);
 
-----------------
--- Interfaces --
-----------------
+---------------
+-- Addresses --
+---------------
 -- Interfaces and addresses on computers
 
 CREATE TABLE services.t_addresses
@@ -66,5 +87,21 @@ ALTER TABLE services.t_addresses ADD CONSTRAINT valid_ip CHECK (services.ip_on_s
 GRANT USAGE ON services.t_addresses_t_addresses_id_seq TO admins;
 GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_addresses TO admins;
 GRANT SELECT ON services.t_addresses TO servers;
+
+DROP TRIGGER IF EXISTS t_addresses_insert_ptr_records ON services.t_addresses;
+CREATE TRIGGER t_addresses_insert_ptr_records
+AFTER INSERT ON services.t_addresses
+FOR EACH ROW
+EXECUTE PROCEDURE services.update_dns_records();
+DROP TRIGGER IF EXISTS t_addresses_update_ptr_records ON services.t_addresses;
+CREATE TRIGGER t_addresses_update_ptr_records
+AFTER UPDATE ON services.t_addresses
+FOR EACH ROW
+EXECUTE PROCEDURE services.update_dns_records();
+DROP TRIGGER IF EXISTS t_addresses_delete_ptr_records ON services.t_addresses;
+CREATE TRIGGER t_addresses_delete_ptr_records
+AFTER DELETE ON services.t_addresses
+FOR EACH ROW
+EXECUTE PROCEDURE services.update_dns_records();
 
 SELECT create_log_triggers('services.t_addresses'::text);

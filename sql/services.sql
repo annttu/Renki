@@ -18,12 +18,15 @@ CREATE TABLE services.t_services
     t_v6addresses_id integer references t_addresses,
     service_type text references t_service_types (service_type) NOT NULL,
     t_domains_id integer references t_domains NOT NULL,
+    priority integer NOT NULL DEFAULT 1,
     info text,
     active boolean DEFAULT true NOT NULL,
     -- can users view this?
     public boolean DEFAULT false NOT NULL,
     UNIQUE (t_addresses_id, service_type)
 );
+
+ALTER TABLE services.t_services ADD CONSTRAINT valid_priority CHECK (priority >= 1);
 
 GRANT USAGE ON services.t_services_t_services_id_seq TO admins;
 GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_services TO admins;
@@ -41,7 +44,8 @@ insert into t_service_types (service_category, service_type) VALUES ('VHOST','WO
 insert into t_service_types (service_category, service_type) VALUES ('SHELL','USER_PORT');
 insert into t_service_types (service_category, service_type) VALUES ('SHELL','SHELL');
 insert into t_service_types (service_category, service_type) VALUES ('OTHER','JABBER');
-insert into t_service_types (service_type, service_category) VALUES ('DNS', 'DNS');
+insert into t_service_types (service_type, service_category) VALUES ('DNS_MASTER', 'DNS');
+insert into t_service_types (service_type, service_category) VALUES ('DNS_SLAVE', 'DNS');
 
 ----------------
 -- User ports --
@@ -334,3 +338,25 @@ DO INSTEAD
 
 GRANT DELETE ON databases TO users;
 GRANT DELETE ON databases TO admins;
+
+-- DNS servers view
+
+CREATE OR REPLACE VIEW public.services
+AS
+SELECT t_services.t_services_id,
+t_addresses.name || '.' || t_domains.name as server,
+t_addresses.ip_address as ip_address, t_v6addresses.ip_address as ipv6_address,
+t_services.priority, t_services.service_type, t_services.info as info
+FROM services.t_services
+JOIN services.t_addresses ON t_services.t_addresses_id = t_addresses.t_addresses_id
+JOIN services.t_domains ON (t_services.t_domains_id = t_domains.t_domains_id)
+JOIN users ON users.name = CURRENT_USER
+JOIN services.t_customers ON (t_customers.t_customers_id = users.t_customers_id)
+LEFT JOIN services.t_addresses t_v6addresses ON t_services.t_v6addresses_id = t_v6addresses.t_addresses_id
+AND t_services.public = TRUE
+AND t_services.active = TRUE
+AND ( t_services.t_domains_id = users.t_domains_id OR public.is_admin())
+ORDER BY t_services.service_type;
+
+GRANT SELECT ON public.services TO users;
+GRANT SELECT ON public.services TO admins;

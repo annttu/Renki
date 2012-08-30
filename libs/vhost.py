@@ -54,12 +54,6 @@ class Vhosts(object):
         mapper(self.main.Vhost_redirects, vhost_redirects, properties={
             'vhost': relationship(self.main.Vhosts, backref='vhost_redirects')
         })
-        vhost_servers = Table('vhost_servers', self.main.metadata,
-            Column("t_services_id", Integer, primary_key=True),
-            Column("server", String),
-            Column("info", String),
-            autoload=False)
-        mapper(self.main.Vhost_servers, vhost_servers)
         self.database_loaded = True
         return True
 
@@ -283,8 +277,9 @@ class Vhosts(object):
     def get_server(self, server):
         """Get vhost_server object by name"""
         try:
-            return self.main.session.query(self.main.Vhost_servers
-                    ).filter(self.main.Vhost_servers.server == server).one()
+            return self.main.session.query(self.main.Services
+                    ).filter(self.main.Services.server == server,
+                    self.main.Services.service_type == 'VHOST').one()
         except NoResultFound:
             self.main.session.rollback()
             raise DoesNotExist('Vhost server %s does not exist' % server)

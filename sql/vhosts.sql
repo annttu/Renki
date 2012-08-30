@@ -43,18 +43,18 @@ DROP TRIGGER IF EXISTS t_vhosts_update_update_dns ON t_vhosts;
 CREATE TRIGGER t_vhosts_insert_update_dns
 AFTER INSERT ON t_vhosts
 FOR EACH ROW
-EXECUTE PROCEDURE add_vhost_dns_entries();
+EXECUTE PROCEDURE vhost_dns_records();
 
 CREATE TRIGGER t_vhosts_delete_update_dns
 AFTER DELETE ON t_vhosts
 FOR EACH ROW
-EXECUTE PROCEDURE add_vhost_dns_entries();
+EXECUTE PROCEDURE vhost_dns_records();
 
 CREATE TRIGGER t_vhosts_update_update_dns
 AFTER UPDATE ON t_vhosts
 FOR EACH ROW
 WHEN (OLD.* IS DISTINCT FROM NEW.*)
-EXECUTE PROCEDURE add_vhost_dns_entries();
+EXECUTE PROCEDURE vhost_dns_records();
 
 CREATE OR REPLACE VIEW public.vhosts
 AS
@@ -320,23 +320,3 @@ AND (t_users.name = CURRENT_USER OR public.is_admin())
 );
 
 GRANT DELETE ON public.vhosts TO users;
-
--- Vhost servers view
-
-CREATE OR REPLACE VIEW public.vhost_servers
-AS
-SELECT t_services.t_services_id,
-t_addresses.name || '.' || t_domains.name as server,
-t_services.info as info
-FROM services.t_services
-JOIN services.t_addresses ON t_services.t_addresses_id = t_addresses.t_addresses_id
-JOIN services.t_domains ON (t_services.t_domains_id = t_domains.t_domains_id)
-JOIN users ON users.name = CURRENT_USER
-JOIN services.t_customers ON (t_customers.t_customers_id = users.t_customers_id)
-WHERE t_services.service_type = 'VHOST'
-AND t_services.public = TRUE
-AND t_services.active = TRUE
-AND ( t_services.t_domains_id = users.t_domains_id OR public.is_admin());
-
-GRANT SELECT ON public.vhost_servers TO users;
-GRANT SELECT ON public.vhost_servers TO admins;

@@ -86,6 +86,25 @@ CREATE TABLE services.t_domains (
 
 SELECT services.create_log_triggers('services.t_domains'::text);
 
+
+-- NOTE: z_ to ensure triggers are executed after log triggers
+DROP TRIGGER IF EXISTS z_domain_insert_default_dns_records ON services.t_domains;
+CREATE TRIGGER z_domain_insert_default_dns_records
+AFTER INSERT ON services.t_domains
+FOR EACH ROW
+EXECUTE PROCEDURE default_dns_records();
+DROP TRIGGER IF EXISTS z_domain_update_default_dns_records ON services.t_domains;
+CREATE TRIGGER z_domain_update_default_dns_records
+AFTER UPDATE ON services.t_domains
+FOR EACH ROW
+WHEN (OLD.* IS DISTINCT FROM NEW.*)
+EXECUTE PROCEDURE default_dns_records();
+DROP TRIGGER IF EXISTS z_domain_delete_default_dns_records ON services.t_domains;
+CREATE TRIGGER z_domain_delete_default_dns_records
+BEFORE DELETE ON services.t_domains
+FOR EACH ROW
+EXECUTE PROCEDURE default_dns_records();
+
 ALTER TABLE servicest_domains ADD CONSTRAINT "domains_check" CHECK (
     refresh_time >= 1
     AND refresh_time <= 9999999
@@ -261,19 +280,32 @@ GRANT USAGE ON services.t_domains_t_domains_id_seq TO admins;
 
 -- DNS-entries table
 
-CREATE TABLE services.t_dns_entries
+CREATE TABLE services.t_dns_records
 (
-    t_dns_entries_id serial PRIMARY KEY NOT NULL,
-    ttl INTEGER NOT NULL DEFAULT 3600,
-    type t_dns_entries_type NOT NULL,
+    t_dns_records_id serial PRIMARY KEY NOT NULL,
     key text NOT NULL,
+    ttl INTEGER NOT NULL DEFAULT 3600,
+    type t_dns_records_type NOT NULL,
     value text NOT NULL,
-    manual boolean NOT NULL default FALSE,
+    manual boolean NOT NULL default TRUE,
     t_domains_id integer references services.t_domains NOT NULL,
     info text
 );
 
-SELECT services.create_log_triggers('services.t_dns_entries'::text);
+ALTER TABLE services.t_dns_records ADD CONSTRAINT valid_ttl CHECK (
+ttl >= 1 AND ttl <= 9999999);
 
-GRANT SELECT ON services.t_dns_entries TO servers;
-GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_dns_entries TO admins;
+CREATE TRIGGER valid_dns_record
+BEFORE INSERT OR UPDATE ON services.t_dns_records
+FOR EACH ROW
+EXECUTE PROCEDURE public.valid_dns_record();
+
+SELECT services.create_log_triggers('services.t_dns_records'::text);
+SELECT services.create_history_table('t_dns_records');
+SELECT services.create_history_triggers('t_dns_records');
+
+GRANT SELECT ON services.t_dns_records TO servers;
+GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_dns_records TO admins;
+
+GRANT SELECT ON services.t_dns_records_history TO servers;
+GRANT SELECT,INSERT,UPDATE,DELETE ON services.t_dns_records_history TO admins;

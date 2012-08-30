@@ -107,6 +107,24 @@ document_root text,
 === t_change_log ===
 * Taulu, joka sisältää tiedot tietokantaan tehdyistä muutoksista
 
+
+=== t_services ===
+* Taulu sisältää tiedon rengin piirissä olevista palveluista
+
+== Kentät ==
+* t_services_id uniikki id
+* t_addresses_id viittaus t_addresses taulussa olevaan osoitteeseen.
+* t_v6addresses_id viittaus t_addresses taulussa olevaan ipv6-osoitteeseen
+* service_type viittaus t_service_types taulussa olevaan palvelun tyyppiin
+* t_domains_id viittaus t_domains tauluun, rajottaa käyttöoikeuden vain saman
+               domainin piiriin
+* info vapaa tekstikenttä
+* active totuusarvo onko palveli käytössä
+* public totuusarvo näytetäänkö palvelu palvelulistauksessa, useamman palvelimen
+         käsittävissä palveluissa vain master on public
+* priority palvelun prioriteetti, jos palvelu käsittää useamman palvelun,
+           masterin prioriteetti on 1 ja muiden 2 tai enemmän.
+
 ==========
 = Viewit =
 ==========
