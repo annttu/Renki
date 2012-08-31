@@ -1182,7 +1182,6 @@ BEGIN
                     WHERE t_domains.name = reverse_address(network);
         ptr_domain := name FROM t_domains
                      WHERE t_domains.t_domains_id = NEW.t_domains_id;
-        RAISE NOTICE 'ptr_domain % ptr_domains_id % network % hostpart %',ptr_domain,ptr_domains_id,reverse_address(network::inet),hostpart;
         IF (ptr_domains_id IS NULL) THEN
             RAISE NOTICE 'Subnet reverse domain entry not exist, creating...';
             EXECUTE 'INSERT INTO t_domains (name, t_customers_id, dns, shared)

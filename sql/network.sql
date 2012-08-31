@@ -81,7 +81,8 @@ CREATE TABLE services.t_addresses
     mac_address macaddr -- optional
 );
 
-ALTER TABLE services.t_addresses ADD UNIQUE (t_domains_id, name);
+CREATE UNIQUE INDEX t_addresses_t_domains_id_address_family_name_key ON
+services.t_addresses (t_domains_id, family(ip_address), name);
 ALTER TABLE services.t_addresses ADD CONSTRAINT valid_name CHECK (name ~* '^[a-z0-9\-\._]*$');
 ALTER TABLE services.t_addresses ADD CONSTRAINT valid_ip CHECK (services.ip_on_subnet(ip_address::inet, t_subnets_id::integer));
 GRANT USAGE ON services.t_addresses_t_addresses_id_seq TO admins;
