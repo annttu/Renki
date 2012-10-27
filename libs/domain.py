@@ -163,3 +163,6 @@ class Domains(object):
             self.reconnect()
             raise RuntimeError('Cannot delete domain %s' % domain)
         return True
+
+class Domain(object):
+    pass
