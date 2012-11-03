@@ -60,7 +60,7 @@ class Database(object):
         for a in aliases:
             if alias.startswith("%s_" % a) or alias == a:
                 return True
-        raise RuntimeError('No alias found for database %s' % alias)
+        raise AliasNotFound('No alias found for database %s' % alias)
 
     def valid_dbtype(self):
         """Check if <dbtype> is valid sql database type
@@ -156,7 +156,7 @@ class Database(object):
             self.log.exception(e)
             raise RuntimeError('Database error %s' % e)
 
-    def add_sql_database(self,server,database,username=None):
+    def add_sql_database(self,server,database,username=None,info=''):
         """Add <database> to server <server> for user
         """
         self._load_database()
@@ -293,9 +293,9 @@ class Database(object):
         raise RuntimeError on database error"""
         return self.get_sql_database(server,database)
 
-    def add(self,server,database,username=''):
+    def add(self,server,database,username=None,info=''):
         """Add <database> to server <server> for user"""
-        return self.add_sql_database(server,database,username)
+        return self.add_sql_database(server,database,username,info)
 
     def delete(self,server,database):
         """Delete <database> on <server>

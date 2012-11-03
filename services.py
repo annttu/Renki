@@ -132,7 +132,7 @@ class Services(object):
             customers = Table('customers', metadata,
                 Column("t_customers_id", Integer, primary_key=True),
                 Column('name', String, nullable=False),
-                Column('masters', ARRAY(TEXT())))
+                Column('aliases', ARRAY(TEXT())))
                 #,
                 #autoload=True)
             mapper(self.Customers, customers)
