@@ -81,7 +81,8 @@ CREATE TABLE services.t_domains (
     admin_address text DEFAULT 'hostmaster@example.com'::text NOT NULL,
     domain_type domain_type DEFAULT 'MASTER'::domain_type NOT NULL,
     masters inet[],
-    allow_transfer inet[]
+    allow_transfer inet[],
+    approved boolean DEFAULT FALSE
 );
 
 SELECT services.create_log_triggers('services.t_domains'::text);
@@ -105,7 +106,7 @@ BEFORE DELETE ON services.t_domains
 FOR EACH ROW
 EXECUTE PROCEDURE default_dns_records();
 
-ALTER TABLE servicest_domains ADD CONSTRAINT "domains_check" CHECK (
+ALTER TABLE services_domains ADD CONSTRAINT "domains_check" CHECK (
     refresh_time >= 1
     AND refresh_time <= 9999999
     AND retry_time >= 1
@@ -189,7 +190,7 @@ AS
 SELECT t_domains.t_domains_id, t_domains.name, t_domains.shared, t_domains.t_customers_id,
 t_domains.dns, t_domains.created, t_domains.updated, t_domains.refresh_time, t_domains.retry_time,
 t_domains.expire_time, t_domains.minimum_cache_time, t_domains.ttl, t_domains.admin_address,
-t_domains.domain_type, t_domains.masters, t_domains.allow_transfer
+t_domains.domain_type, t_domains.masters, t_domains.allow_transfer, t_domains.approved
 FROM services.t_domains
 JOIN services.t_customers USING (t_customers_id)
 JOIN services.t_users USING (t_customers_id)
@@ -201,7 +202,7 @@ CREATE OR REPLACE RULE domains_insert
 AS ON INSERT TO public.domains
 DO INSTEAD
 INSERT INTO services.t_domains
-(t_customers_id, name, shared,dns,refresh_time,retry_time,expire_time,minimum_cache_time,ttl,admin_address,domain_type,masters,allow_transfer)
+(t_customers_id, name, shared,dns,refresh_time,retry_time,expire_time,minimum_cache_time,ttl,admin_address,domain_type,masters,allow_transfer,approved)
 SELECT DISTINCT(t_customers_id),
 NEW.name,
 NEW.shared,
@@ -214,7 +215,8 @@ NEW.ttl,
 NEW.admin_address,
 NEW.domain_type,
 NEW.masters,
-NEW.allow_transfer
+NEW.allow_transfer,
+public.is_admin()
 FROM users
 WHERE ( users.name = CURRENT_USER AND NOT public.is_admin()) OR ( public.is_admin() = true AND users.t_customers_id = NEW.t_customers_id )
 AND (select COUNT(domains.t_domains_id) FROM domains, users WHERE users.name = CURRENT_USER AND domains.t_customers_id = users.t_customers_id) < 50
@@ -226,7 +228,7 @@ t_domains.refresh_time, t_domains.retry_time,
 t_domains.expire_time, t_domains.minimum_cache_time,
 t_domains.ttl, t_domains.admin_address,
 t_domains.domain_type, t_domains.masters,
-t_domains.allow_transfer
+t_domains.allow_transfer, t_domains.approved
 ;
 
 CREATE OR REPLACE RULE
@@ -245,7 +247,8 @@ ttl=new.ttl,
 admin_address=new.admin_address,
 domain_type=new.domain_type,
 masters=new.masters,
-allow_transfer=new.allow_transfer
+allow_transfer=new.allow_transfer,
+approved=((public.is_admin() AND NEW.approved) OR OLD.approved)
 FROM services.t_customers, services.t_users
 WHERE t_domains.t_domains_id = new.t_domains_id
 AND old.t_customers_id = t_customers.t_customers_id

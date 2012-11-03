@@ -27,8 +27,8 @@ DROP RULE t_subnets_add_ptr_domain ON services.t_subnets;
 CREATE RULE t_subnets_add_ptr_domain AS
 ON INSERT TO services.t_subnets
 DO ALSO
-INSERT INTO t_domains (name, t_customers_id, dns, shared)
-    VALUES (reverse_address(NEW.address), 0, TRUE, FALSE);
+INSERT INTO t_domains (name, t_customers_id, dns, shared, approved)
+    VALUES (reverse_address(NEW.address), 0, TRUE, FALSE, TRUE);
 
 DROP RULE t_subnets_update_ptr_domain ON services.t_subnets;
 CREATE RULE t_subnets_update_ptr_domain AS

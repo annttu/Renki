@@ -179,7 +179,7 @@ class Services(object):
         except OperationalError as e:
             self.log.exception(e)
         try:
-            services = Table('services', self.main.metadata,
+            services = Table('services', self.metadata,
                             Column("t_services_id", Integer, primary_key=True),
                             Column("server", String),
                             Column("info", String),

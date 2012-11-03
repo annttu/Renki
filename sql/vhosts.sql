@@ -90,6 +90,7 @@ GROUP BY t_vhosts.t_vhosts_id,t_dom.name,t_customers.t_customers_id,t_users.name
 ALTER TABLE public.vhosts ALTER COLUMN logaccess SET DEFAULT false;
 ALTER TABLE public.vhosts ALTER COLUMN created SET DEFAULT NOW();
 ALTER TABLE public.vhosts ALTER COLUMN locked SET DEFAULT false;
+ALTER TABLE public.vhosts ALTER COLUMN disabled SET DEFAULT false;
 
 GRANT SELECT ON public.vhosts TO users;
 
