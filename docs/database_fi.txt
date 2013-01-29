@@ -40,8 +40,8 @@ Dokumentaatio tietokannoista
 * ttl (integer) SOA tietue
 * admin_address (text) hostmasterin sähköpostiosoite
 * domain_type (MASTER|SLAVE|NONE), onko tämä nimipalvelin ensi- vai toissijainen
-* masters inet[] lista domainin master-palvelimista
-* allow_transfer inet[] mitkä palvelimet saavat hakea domainin tältä palvelimelta.
+* masters text[] lista domainin master-palvelimista
+* allow_transfer text[] mitkä palvelimet saavat hakea domainin tältä palvelimelta.
 
 === t_vhosts ===
 * taulu, johon aliakset referoi

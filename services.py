@@ -23,8 +23,7 @@ from libs.user_port import User_ports
 from libs.host import Hosts
 from libs.subnet import Subnets
 from exceptions import DatabaseError, DoesNotExist, PermissionDenied
-from libs.types import INETARRAY
-from sqlalchemy.dialects.postgresql import INET
+from sqlalchemy.dialects.postgresql import INET, ARRAY
 
 logging.basicConfig()
 logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
@@ -152,8 +151,8 @@ class Services(object):
                 Column('ttl', Integer, nullable=False, default=text('10800')),
                 Column('admin_address', String, nullable=True),
                 Column('domain_type', Enum('MASTER', 'SLAVE', 'NONE'), primary_key=False, nullable=False, default=text("'MASTER'::domain_type")),
-                Column('masters', INETARRAY(), primary_key=False),
-                Column('allow_transfer', INETARRAY(), primary_key=False))
+                Column('masters', ARRAY(), primary_key=False),
+                Column('allow_transfer', ARRAY(), primary_key=False))
                 #autoload=True)
             mapper(self.Domains, domains, properties={
                 'customer': relationship(self.Customers, backref='domains'),

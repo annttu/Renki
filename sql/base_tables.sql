@@ -80,8 +80,8 @@ CREATE TABLE services.t_domains (
     ttl integer DEFAULT 10800 NOT NULL,
     admin_address text DEFAULT 'hostmaster@example.com'::text NOT NULL,
     domain_type domain_type DEFAULT 'MASTER'::domain_type NOT NULL,
-    masters inet[],
-    allow_transfer inet[],
+    masters text[],
+    allow_transfer text[],
     approved boolean DEFAULT FALSE
 );
 
