@@ -23,7 +23,7 @@ from libs.user_port import User_ports
 from libs.host import Hosts
 from libs.subnet import Subnets
 from exceptions import DatabaseError, DoesNotExist, PermissionDenied
-from sqlalchemy.dialects.postgresql import INET, ARRAY
+from sqlalchemy.dialects.postgresql import INET, ARRAY, TEXT
 
 logging.basicConfig()
 logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
@@ -39,6 +39,12 @@ def on_first_connect_listener(target, context):
     log.info("Connecting to database...")
 
 class Services(object):
+    """
+    Services object
+
+    This object holds most of all methods on services library.
+
+    """
     def __init__(self, username, password, server, port=None, database='services', verbose=False, dynamic_load=True):
         self.__picklethis__ = {}
         self.db = None
@@ -63,6 +69,14 @@ class Services(object):
         self.admin_user = False
 
     def login(self):
+        """
+        Login to services database
+
+        >> srv = Services(arguments)
+        >> srv.login()
+        Mapping objects!
+        >> 
+        """
         self.connect()
         try:
             self.map_objects()
@@ -73,10 +87,13 @@ class Services(object):
             raise RuntimeError('Invalid login')
         del self.db_password
         if self.username:
-            self.customer_id = self.get_current_user().t_customers_id
+            self.customer_id = self.get_user().t_customers_id
         self.load_modules()
 
     def load_modules(self):
+        """
+        Load all submodules
+        """
         if self.loaded:
             return
         self.mysql = MySQL(self)
@@ -91,10 +108,16 @@ class Services(object):
         self.loaded = True
 
     def commit_session(self):
+        """
+        Clear session
+        """
         self.session.commit()
         self.session = None
 
     def connect(self, database=None,user=None,password=None,server=None, port=None):
+        """
+        Connect to database
+        """
         if self.db:
             return
         if not database:
@@ -119,6 +142,7 @@ class Services(object):
                 # already mapped
                 return True
         except:
+            # TODO: WAT?
             pass
         try:
             print("Mapping objects!")
@@ -151,8 +175,8 @@ class Services(object):
                 Column('ttl', Integer, nullable=False, default=text('10800')),
                 Column('admin_address', String, nullable=True),
                 Column('domain_type', Enum('MASTER', 'SLAVE', 'NONE'), primary_key=False, nullable=False, default=text("'MASTER'::domain_type")),
-                Column('masters', ARRAY(), primary_key=False),
-                Column('allow_transfer', ARRAY(), primary_key=False))
+                Column('masters', ARRAY(TEXT), primary_key=False),
+                Column('allow_transfer', ARRAY(TEXT), primary_key=False))
                 #autoload=True)
             mapper(self.Domains, domains, properties={
                 'customer': relationship(self.Customers, backref='domains'),
@@ -190,7 +214,12 @@ class Services(object):
             return True
         except OperationalError as e:
             self.log.exception(e)
+
+
     def getSession(self):
+        """
+        Get SQLAlchemy database session
+        """
         try:
             Session = sessionmaker(bind=self.db)
             self.session = Session()
@@ -208,12 +237,23 @@ class Services(object):
     ###########
 
     def require_admin(self):
+        """
+        Raises PermissionDenied exception if user is not admin
+        else returns True
+
+        @Todo: Implement this:
+        @self.require_admin
+        def function_needing_privileges(self):
+        """
         if self.is_admin(self.db_username) is False:
             raise PermissionDenied('Insufficient permissions')
         return True
 
     def list_users(self):
-        """List all users"""
+        """
+        List all users
+        @TODO: this needs admin privileges?
+        """
         users = self.session.query(self.Users)
         try:
             users = users.all()
@@ -228,68 +268,56 @@ class Services(object):
             raise RuntimeError('Cannot get users')
 
     def get_customer_id(self):
-        if self.username != None:
-            user = self.session.query(self.Users).filter(self.Users.username == self.username)
-            try:
-                user = user.one()
-                return user.t_customers_id
-            except NoResultFound:
-                return None
-            except Exception as e:
-                self.session.rollback()
-                self.log.exception(e)
-                return None
+        """
+        Fetch current users customer_id
+        @TODO: this should use self.get_current_user method
+        """
+        user = self.get_user()
+        if user:
+            return user.t_customers_id
 
-    def get_current_user(self):
+    def get_user(self, username=None):
         """Get current selected user
         Raises DoesNotExist if no user found
-        Raises RuntimeError on error"""
-        if self.customer_id != None or self.username != None:
-            user = self.session.query(self.Users)
-            if self.customer_id != None:
-                user = user.filter(self.Users.t_customers_id == self.customer_id)
-            if self.username != None:
-                user = user.filter(self.Users.name == self.username)
-            try:
-                user = user.one()
-                self.session.commit()
-                return user
-            except NoResultsFound:
-                raise DoesNotExist('No user %s found' % self.username)
-            except Exception as e:
-                self.log.exception(e)
-                self.session.rollback()
-                raise RuntimeError('Cannot get current user, database error')
-            except:
-                self.session.rollback()
-                raise RuntimeError('Cannot get current user, database error')
-        else:
-            raise RuntimeError('Select user first')
+        Raises RuntimeError on error
 
-    def is_admin(self,username=None):
-        """Test if user is admin user"""
-        if username is None:
-            username = self.db_username
+        @TODO: this should be cached
+        """
+        customer_id = None
+        if not username:
+            username = self.username
+            customer_id = self.customer_id
+            if customer_id == None and username == None:
+                raise RuntimeError('Select user first')
+        user = self.session.query(self.Users)
+        if customer_id != None:
+            user = user.filter(self.Users.t_customers_id == customer_id)
+        if username != None:
+            user = user.filter(self.Users.name == username)
         try:
-            retval = self.session.query(self.Users).filter(self.Users.name == username).one()
+            user = user.one()
             self.session.commit()
-            return retval.admin
-        except NoResultFound:
-            self.session.rollback()
-            raise DoesNotExist('User %s does not exist' % username)
-        except:
-            self.session.rollback()
-            self.reconnect()
-        try:
-            retval = self.session.query(self.Users).filter(self.Users.name == str(username)).one()
-            self.session.commit()
-            return retval.admin
+            return user
+        except NoResultsFound:
+            raise DoesNotExist('No user %s found' % username)
         except Exception as e:
             self.log.exception(e)
+            self.session.rollback()
+            raise RuntimeError('Cannot get current user, database error')
         except:
-            pass
-        raise RuntimeError('Cannot get user %s, database error' % username)
-        return False
+            self.session.rollback()
+            raise RuntimeError('Cannot get current user, database error')
+
+    def is_admin(self,username=None):
+        """
+        Test if user is admin user
+        """
+        if username is None:
+            username = self.db_username
+        user =self.get_user(username=username)
+        if not user:
+            raise DoesNotExist('User %s does not exist in database' % username)
+        return user.admin
 
     def list_aliases(self,user=None):
         """List <username> aliases"""
@@ -329,12 +357,16 @@ class Services(object):
         """Get username by t_customers_id"""
         if not self.customer_id:
             raise RuntimeError('Select customer first')
-        try:
-            query = self.session.query(self.Users.name).filter(self.Users.t_customers_id == self.customer_id).one()
-        except NoResultFound:
+        user = self.get_user()
+        if user:
+            return user.name
+        else:
             raise DoesNotExist('User for customer_id %s does not found' % self.customer_id)
 
     def add_user(self, username, first_names=None, last_name=None, uid=None):
+        """
+        TODO: this requires admin privileges!!
+        """
         if not self.customer_id:
             raise RuntimeError('Select customer first')
         try:
