@@ -90,6 +90,18 @@ def valid_fqdn(string):
     # Don't allow ower six dots on address
     if len(string) > 6:
         return False
+
+    for substring in string:
+        if len(substring) < 1:
+            return False
+        if not substring[0].isalpha() and not substring[0].isdigit():
+            return False
+        elif not substring[-1].isalpha() and not substring[-1].isdigit():
+            return False
+        for char in substring:
+            if not char.isalpha() and not char.isdigit() and not char in "-":
+                return False
+
     return True
 
 def is_int(string):

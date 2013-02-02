@@ -18,7 +18,8 @@ from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy import MetaData, Table, Column, Integer, ForeignKey
 from sqlalchemy.orm import mapper
 
-from services.libs.tools import is_int, is_bool, valid_fqdn, valid_ipv4_address, valid_ipv6_address
+from services.libs.tools import is_int, is_bool, valid_fqdn, valid_ipv4_address, \
+                                valid_ipv6_address, idna_domain
 
 from lepl.apps.rfc3696 import Email
 
@@ -81,81 +82,196 @@ class Domains(object):
                 raise RuntimeError('Error while getting domain')
 
     def add(self, domain, shared=False,dns=True, admin_address=None,
-                    domain_type='MASTER', refresh_time=None, retry_time=None,
-                    expire_time=None, minimum_cache_time=None, ttl=None):
-        """add domain for user"""
-        new = self.main.Domains()
+            domain_type='MASTER', refresh_time=None, retry_time=None,
+            expire_time=None, minimum_cache_time=None, ttl=None,commit=True):
+        """
+        Create new Domain object
+
+        """
+        new = Domain(self.main)
         new.t_customers_id = self.main.customer_id
         new.name = domain
         new.shared = shared
         new.dns = dns
-        if domain_type.upper() in ['MASTER', 'SLAVE', 'NONE']:
-            new.domain_type = domain_type.upper()
-        elif domain_type:
-            raise RuntimeError('Invalid domain type %s' % domain_type)
-        if admin_address:
-            new.admin_address = admin_address
-        else:
-            new.admin_address = self.main.defaults.hostmaster_address
-        if refresh_time:
-            if refresh_time >= 1 and refresh_time <= 999999:
-                new.refresh_time = refresh_time
-            else:
-                raise RuntimeError('Invalid refresh_time %s' % refresh_time)
-        if retry_time:
-            if retry_time >= 1 and retry_time <= 999999:
-                new.retry_time = retry_time
-            else:
-                raise RuntimeError('Invalid retry_time %s' % retry_time)
-        if expire_time:
-            if expire_time >= 1 and expire_time <= 999999:
-                new.expire_time = expire_time
-            else:
-                raise RuntimeError('Invalid expire_time %s' % expire_time)
-        if minimum_cache_time:
-            if minimum_cache_time >= 1 and minimum_cache_time <= 999999:
-                new.minimum_cache_time = minimum_cache_time
-            else:
-                raise RuntimeError('Invalid minimum_cache_time %s' % minimum_cache_time)
-        if ttl:
-            if ttl >= 1 and ttl <= 999999:
-                new.ttl = ttl
-            else:
-                raise RuntimeError('Invalid ttl %s' % ttl)
-        try:
-            self.main.session.add(new)
-            self.main.session.commit()
-        except OperationalError as e:
-            self.log.exception(e)
-            self.main.session.rollback()
-            raise RuntimeError('Operational error')
-        except IntegrityError as e:
-            self.log.exception(e)
-            self.main.session.rollback()
-            raise RuntimeError('Cannot add domain %s' % domain)
+        new.domain_type = domain_type.upper()
+        new.admin_address = admin_address
+        new.refresh_time = refresh_time
+        new.retry_time = retry_time
+        new.expire_time = expire_time
+        new.minimum_cache_time = minimum_cache_time
+        new.ttl = ttl
+        if commit:
+            new.commit()
+        return new
 
+
+class Domain(object):
+    """Domain object, holds information about spesific domain
+    """
+
+    def __init__(self, main, domain_id=None):
+        # Force domain_id to be either None or positive integer
+        self.main = main
+        assert(domain_id == None or str(domain_id).isdigit())
+        # Domain object values
+        self._name = None
+        self._domain_id = domain_id
+        self._t_customers_id = None
+        self._shared = None
+        self._dns = None
+        self.created = None
+        self.updated = None
+        self._refresh_time = None
+        self._retry_time = None
+        self._expire_time = None
+        self._minimum_cache_time = None
+        self._ttl = None
+        self._admin_address = self.main.defaults.hostmaster_address
+        self._domain_type = None
+        self._masters = []
+        self._allow_transfer = []
+        self._approved = None
+
+        # Other values
+        self._vhosts = None
+        self._email_aliases = None
+        self._mailboxes = None
+        self._database_object = None
+        if self._domain_id:
+            self._from_database()
+
+    def commit(self):
+        """
+        Commit changes on Domain object to database
+        """
+        if not self._database_object:
+            # Create new 
+            self._database_object = self.main.Domains()
+        self._database_object.name = self.name
+        self._database_object.t_customers_id = self._t_customers_id
+        self._database_object.shared = self._shared
+        self._database_object.dns = self._dns
+        self._database_object.domain_type = self._domain_type
+        self._database_object.admin_address = self._admin_address
+        self._database_object.refresh_time = self._refresh_time
+        self._database_object.retry_time = self._retry_time
+        self._database_object.expire_time = self._expire_time
+        self._database_object.minimum_cache_time = self._minimum_cache_time
+        self._database_object.ttl = self._ttl
+        self._database_object.masters = self._masters
+        self._database_object.allow_transfer = self._allow_transfer
+        self._database_object._approved = self._approved
+        # commit changes to database
+        self.main.session.add(self._database_object)
+        if not self.main.safe_commit():
+            raise RuntimeError('Cannot add domain %s' % domain)
+        self._domain_id = self._database_object.t_domains_id
         return True
 
-    def delete(self, domain):
-        """Delete given domain and it dependencies
+    def _from_database(self, database_object=None):
         """
-        # delete these before domain
-        # - vhosts
-        # - mail aliases
-        # - mailboxes
-        if not domain or domain == '':
-            raise RuntimeError('No domain given to del_domain')
-        try:
-            dom = self.get(domain)
-        except DoesNotExist:
-            raise RuntimeError('Domain %s does not found' % domain)
-        for vhost in self.main.vhosts.list(domain):
-            self.main.session.delete(vhost)
-        for mail_alias in self.main.mailboxes.list_aliases(domain):
-            self.main.session.delete(mail_alias)
-        for mailbox in self.main.mailboxes.list(domain):
-            self.main.session.delete(mailbox)
-        self.main.session.delete(dom)
+        Fetch Domain content from database
+        """
+        raise NotImplemented('TODO')
+        if database_object:
+            self._database_object = database_object
+        elif not self._database_object:
+            # fetch object from database
+                search = search.filter(self.main.Domains.t_customers_id==self.main.customer_id)
+                search = search.one()
+                if not self.main.safe_commit():
+                    raise RuntimeError("Cannot fetch Domain %s from database" %
+                                       self._domain_id)
+                self.database_object = search
+        if self._database_object:
+            # set variables
+            self._name = self._database_object.name
+            self._t_customers_id = self._database_object.t_customers_id
+            # TODO
+
+
+    def _get_vhosts(self):
+        """
+        Internal method to fetch vhosts
+        """
+        if not self.domain_id:
+            raise RuntimeError("Cannot fetch vhost for uncommitted domain")
+        elif self._vhosts == None:
+            self.vhosts = self.main.vhosts.get(t_domains_id=self.domain_id)
+
+
+    def _get_email_aliases(self):
+        """
+        Internal method to fetch email_aliases
+        """
+        if self.domain_id == None or self.name == None:
+            raise RuntimeError("Cannot fetch email aliases for uncommitted domain")
+        elif self._email_aliases == None:
+           self._email_aliases =  self.main.mailboxes.list_aliases(self.name)
+
+
+    def _get_mailboxes(self):
+        """
+        Internal method to fetch mailboxes
+        """
+        if self.domain_id == None or self.name == None:
+            raise RuntimeError("Cannot fetch mailboxes for uncommitted domain")
+        elif self._mailboxes == None:
+            self._mailboxes = self.main.mailboxes.list(self.name)
+
+
+    def list_vhosts(self):
+        """
+        Get list of vhosts on this domain
+        """
+        if self._vhosts == None:
+            self._get_vhosts()
+        if self._vhosts:
+            return self._vhosts
+        return []
+
+    def list_email_aliases(self):
+        """
+        Get list of email addresses related to this domain
+        """
+        self._get_email_aliases()
+        if self._email_aliases:
+            return self._email_aliases
+        return []
+
+    def list_mailboxes(self):
+        """
+        Get list of email boxes related to this domain
+        """
+        self._get_mailboxes()
+        if self._mailboxes:
+            return self._mailboxes
+        return []
+
+    def delete(self):
+        """
+        Delete domain and related services
+
+        Command gets directly committed to database
+
+        This command deletes also all this domain related services
+        - vhosts
+        - email addresses
+        """
+        if not self.domain_id:
+            raise RuntimeError("Can't delete domain from database")
+        if not self.database_object:
+            self.from_database()
+
+        raise NotImplemented('TODO')
+
+        for vhost in self.get_vhosts():
+            vhost.delete()
+        for mail_alias in self.list_email_addresses():
+            mail_alias.delete()
+        for mailbox in self.list_mailboxes():
+            mailbox.delete()
+        self.main.session.delete(self._database_object)
         try:
             self.main.session.commit()
         except OperationalError as e:
@@ -168,60 +284,35 @@ class Domains(object):
             raise RuntimeError('Cannot delete domain %s' % domain)
         return True
 
-class Domain(object):
-    """Domain object, holds information about spesific domain
-    """
-
-    def __init__(self, main, domain_id=None):
-        # Force domain_id to be either None or positive integer
-        self.main = main
-        assert(domain_id == None or str(domain_id).isdigit())
-        self.name = None
-        self.domain_id = id
-        self.t_customers_id = None
-        self._shared = None
-        self._dns = None
-        self.created = None
-        self.updated = None
-        self._refresh_time = None
-        self._retry_time = None
-        self._expire_time = None
-        self._minimum_cache_time = None
-        self._ttl = None
-        self._admin_address = None
-        self._domain_type = None
-        self._masters = []
-        self._allow_transfer = []
-        self._approved = None
-
-    def commit(self):
-        """
-        Commit changes on Domain object to database
-        """
-        raise NotImplemented('TODO')
-
-    def from_database(self):
-        """
-        Fetch Domain content from database
-        """
-        self._get_vhosts()
-        raise NotImplemented('TODO')
-
-    def _get_vhosts(self):
-        """
-        Internal method to fetch vhosts from database
-        """
-        raise NotImplemented('TODO')
-
-    def delete(self):
-        """
-        Delete this object
-        Marks object to be deleted from database at next commit
-        """
-        raise NotImplemented('TODO')
-
 
     # Domain values are properties
+
+    @property
+    def domain_id(self):
+        if self._database_object:
+            return self.database_object.t_domains_id
+        return None
+
+    @property
+    def t_domains_id(self):
+        return self.domain_id
+
+    # t_domains_id is constant
+
+    @property
+    def t_customers_id(self):
+        return self._t_customers_id
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, value):
+        if valid_fqdn(value):
+            self._name = idna_domain(value).lower()
+        else:
+            raise ValueError('Domain name must be valid fully qualified domain name')
 
     @property
     def shared(self):
@@ -249,6 +340,8 @@ class Domain(object):
 
     @refresh_time.setter
     def refresh_time(self, value):
+        if value == None:
+            value = self.main.defaults.retry_time
         if not isinstance(value, int):
             raise ValueError('A refresh_time value must be integer!')
         elif value < 1 or value > 999999:
@@ -257,10 +350,12 @@ class Domain(object):
 
     @property
     def retry_time(self):
-        return self.retry_time
+        return self._retry_time
 
     @retry_time.setter
     def retry_time(self, value):
+        if value == None:
+             value = self.main.defaults.retry_time
         if not isinstance(value, int):
             raise ValueError('A retry_time value must be integer!')
         elif value < 1 or value > 999999:
@@ -269,10 +364,12 @@ class Domain(object):
 
     @property
     def expire_time(self):
-        return self.expire_time
+        return self._expire_time
 
     @expire_time.setter
     def expire_time(self, value):
+        if value == None:
+             value = self.main.defaults.expire_time
         if not isinstance(value, int):
             raise ValueError('An expire time value must be integer!')
         elif value < 1 or value > 999999:
@@ -287,6 +384,8 @@ class Domain(object):
 
     @minimum_cache_time.setter
     def minimum_cache_time(self, value):
+        if value == None:
+            value = self.main.defaults.minimum_cache_time
         if not isinstance(value, int):
             raise ValueError('A minimum cache time value must be integer!')
         elif value < 1 or value > 999999:
@@ -300,6 +399,8 @@ class Domain(object):
 
     @ttl.setter
     def ttl(self, value):
+        if value == None:
+            value = self.main.defaults.ttl
         if not isinstance(value, int):
             raise ValueError('A TTL value must be integer!')
         elif value < 1 or value > 999999:
@@ -311,7 +412,13 @@ class Domain(object):
         return self._admin_address
     @admin_address.setter
     def admin_address(self, value):
-        if not isinstance(value, str):
+        if not value:
+            self._admin_address = self.main.defaults.hostmaster_address
+            return
+        elif isinstance(value, str):
+            value = unicode(value)
+        if not isinstance(value, unicode):
+            print(type(value))
             raise ValueError('An admin address must be string!')
         elif not valid_email(value):
             raise ValueError('An admin address must be valid email address!')
@@ -354,7 +461,7 @@ class Domain(object):
     def allow_transfer(self):
         return self._allow_transfer
 
-    @masters.setter
+    @allow_transfer.setter
     def allow_transfer(self, value):
         if not isinstance(value, list):
             raise ValueError('Allow transfer value must be list!')
@@ -369,5 +476,13 @@ class Domain(object):
             elif ns == "localhost":
                 raise ValueError("Masters server address can't be localhost!")
             values.append(ns)
-        self._allow_transfer= values
+        self._allow_transfer = values
 
+    def __str__(self):
+        return "Domain %s owner id %s" % (self.name, self.t_customers_id)
+
+    def __unicode__(self):
+        return unicode(self.__str__())
+
+    def __repr__(self):
+        return self.__str__()

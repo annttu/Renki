@@ -36,6 +36,8 @@ class DummyServices(Services):
         self.login_fail = False
         self.database_fail = False
         self.emulate_admin = False
+        # dynamic load fails on dummy mode
+        kwargs['dynamic_load'] = False
         if "login_fail" in kwargs:
             self.login_fail = bool(kwargs["login_fail"])
             del kwargs["login_fail"]
@@ -54,6 +56,9 @@ class DummyServices(Services):
             raise RuntimeError('Invalid login')
         if self.username:
             self.customer_id = self.get_user().t_customers_id
+        self.map_objects()
+        self.load_modules()
+        self.getSession()
 
     #def load_modules(self):
     #    self.loaded = True
@@ -79,6 +84,23 @@ class DummyServices(Services):
         if self.database_fail:
             return False
         return True
+
+    def load_modules(self):
+        """
+        Load all submodules
+        """
+        if self.loaded:
+            return
+        #self.mysql = MySQL(self)
+        #self.postgresql = PostgreSQL(self)
+        self.domains = Domains(self)
+        #self.vhosts = Vhosts(self)
+        #self.mailboxes = Mailboxes(self)
+        #self.user_ports = User_ports(self)
+        #if self.admin_user:
+        #    self.subnets = Subnets(self)
+        #    self.hosts = Hosts(self)
+        self.loaded = True
 
     def getSession(self):
         if self.database_fail:

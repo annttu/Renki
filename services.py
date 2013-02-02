@@ -232,6 +232,25 @@ class Services(object):
     def reconnect(self):
         self.session.rollback()
 
+    def safe_commit(self):
+        """
+        Execute session.commit and report if it success
+        Else catch errors, log those and raise proper exception
+        """
+        try:
+            self.session.commit()
+        except OperationalError as e:
+            # Database connection failed etc
+            self.log.exception(e)
+            self.session.rollback()
+            raise DatabaseError('Cannot commit chantes to database')
+        except IntegrityError as e:
+            # Wrong values etc passed to function
+            self.log.exception(e)
+            self.main.session.rollback()
+            return False
+        return True
+
     ###########
     ## Users ##
     ###########

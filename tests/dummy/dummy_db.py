@@ -7,6 +7,10 @@ Dummy database implementation
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.exc import IntegrityError, OperationalError, InvalidRequestError
 
+import logging
+
+logger = logging.getLogger('dummy_db')
+
 class DB(object):
     pass
 
@@ -35,6 +39,12 @@ class Session(object):
             InvalidRequestError('Fake: Already on transaction, rollback!')
         self.in_transaction = True
         return Query()
+
+    def add(self, *args, **kwargs):
+        return True
+
+    def delete(self, *args, **kwargs):
+        return True
 
     def commit(self):
         if self.in_transaction:
