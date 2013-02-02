@@ -2,3 +2,4 @@ service_tester.py
 *.pyc
 env/
 database.sql
+*.swp
