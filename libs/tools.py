@@ -5,6 +5,9 @@
 
 import struct
 import re
+import logging
+
+logger = logging.getLogger('libs.tools')
 
 def valid_ipv6_address(address):
     """Validate ipv6 address"""
@@ -70,6 +73,25 @@ def ipv6_in_block(ip,net):
    mask = (0xffffffffffffffffffffffffffffffff << (128 - int(bits))) & 0xffffffffffffffffffffffffffffffff
    return (ipaddr & mask) == (netaddr & mask)
 
+def valid_fqdn(string):
+    string = string.split('.')
+    if len(string) < 2:
+        return False
+
+    # tld contains only letters
+    for char in string[-1]:
+        if not char.isalpha():
+            return False
+
+    # main part of domain should be at least two chars long
+    if len(string[-2]) < 2:
+        return False
+
+    # Don't allow ower six dots on address
+    if len(string) > 6:
+        return False
+    return True
+
 def is_int(string):
     """test if string is int"""
     try:
@@ -90,3 +112,6 @@ def idna_address(address):
 def idna_domain(domain):
     """IDNA-encode domain"""
     return domain.encode('idna').decode()
+
+def is_bool(value):
+    return value in [True, False]
