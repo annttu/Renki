@@ -74,7 +74,6 @@ class Services(object):
 
         >> srv = Services(arguments)
         >> srv.login()
-        Mapping objects!
         >> 
         """
         self.connect()
@@ -145,7 +144,7 @@ class Services(object):
             # TODO: WAT?
             pass
         try:
-            print("Mapping objects!")
+            #print("Mapping objects!")
             metadata = MetaData(self.db)
             self.metadata = metadata
             # TODO: this is needed, but why?
@@ -174,7 +173,9 @@ class Services(object):
                 Column('minimum_cache_time', Integer, nullable=False, default=text('21600')),
                 Column('ttl', Integer, nullable=False, default=text('10800')),
                 Column('admin_address', String, nullable=True),
-                Column('domain_type', Enum('MASTER', 'SLAVE', 'NONE'), primary_key=False, nullable=False, default=text("'MASTER'::domain_type")),
+                Column('domain_type', Enum('MASTER', 'SLAVE', 'NONE',
+                       name="domain_type"), primary_key=False, nullable=False,
+                       default=text("'MASTER'::domain_type")),
                 Column('masters', ARRAY(TEXT), primary_key=False),
                 Column('allow_transfer', ARRAY(TEXT), primary_key=False))
                 #autoload=True)
@@ -247,7 +248,7 @@ class Services(object):
         except IntegrityError as e:
             # Wrong values etc passed to function
             self.log.exception(e)
-            self.main.session.rollback()
+            self.session.rollback()
             return False
         return True
 
@@ -317,7 +318,7 @@ class Services(object):
             user = user.one()
             self.session.commit()
             return user
-        except NoResultsFound:
+        except NoResultFound:
             raise DoesNotExist('No user %s found' % username)
         except Exception as e:
             self.log.exception(e)

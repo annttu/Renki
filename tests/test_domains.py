@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # encoding: utf-8
-import unittest
-from services.tests.dummy.dummy_services import *
+
+from services.tests.test_setup import ServicesTestCase
 from services.libs.domain import Domain
 
+import unittest
 
-class TestDomain(unittest.TestCase):
+class TestDomain(ServicesTestCase):
     """
     Test services.libs.domains.Domain object functionality
     """
@@ -29,10 +30,7 @@ class TestDomain(unittest.TestCase):
             pass
         self.assertFalse(failed, "Domain should accept %s value %s" % (key, value))
 
-    def setUp(self):
-        self.srv = DummyServices(username='unittest', password='', server='localhost',
-                                 database='services')
-        self.srv.login()
+    def local_setup(self):
         self.domain = Domain(self.srv)
 
     def test_domain_ttl(self):
@@ -126,15 +124,10 @@ class TestDomain(unittest.TestCase):
 
     # @TODO: test commit and delete commands
 
-class TestDomains(unittest.TestCase):
+class TestDomains(ServicesTestCase):
     """
     Test services.libs.domains.Domains object functionality
     """
-
-    def setUp(self):
-        self.srv = DummyServices(username='unittest', password='',
-                                 server='localhost', database='services')
-        self.srv.login()
 
     def test_creating(self):
         domain = self.srv.domains.add("kapsi.fi", shared=True, dns=True,
@@ -144,6 +137,7 @@ class TestDomains(unittest.TestCase):
         self.assertEqual(domain.admin_address,
                          self.srv.defaults.hostmaster_address, 
                          "domain hostmaster_address should be default")
-        
+        self.assertTrue(domain.delete(), "Domain deleting should success")
+
 if __name__ == '__main__':
     unittest.main()

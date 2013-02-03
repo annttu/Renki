@@ -6,10 +6,15 @@ This file contains dummy implementatio of Services object to emulate real one.
 """
 
 
+from sqlalchemy import *
+from sqlalchemy.dialects.postgresql import *
+from sqlalchemy import event
+from sqlalchemy.orm import mapper, sessionmaker, relationship, clear_mappers
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 
-from services.services import Services
+from services import services
 from services.libs.database import MySQL, PostgreSQL
 from services.libs.domain import Domains
 from services.libs.vhost import Vhosts
@@ -27,12 +32,11 @@ logging.basicConfig()
 logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 
-class DummyServices(Services):
+class DummyServices(services.Services):
     """
     Dummy services implementation for unittesting
     """
     def __init__(self, *args, **kwargs):
-        super(DummyServices, self).__init__(*args, **kwargs)
         self.login_fail = False
         self.database_fail = False
         self.emulate_admin = False
@@ -47,43 +51,10 @@ class DummyServices(Services):
         if "emulate_admin" in kwargs:
             self.emulate_admin = kwargs["emulate_admin"]
             del kwargs["emulate_admin"]
+        super(DummyServices, self).__init__(*args, **kwargs)
+        self.login()
+        self.metadata.create_all(self.db)
 
-    def login(self):
-        """
-        Emulate login
-        """
-        if self.login_fail:
-            raise RuntimeError('Invalid login')
-        if self.username:
-            self.customer_id = self.get_user().t_customers_id
-        self.map_objects()
-        self.load_modules()
-        self.getSession()
-
-    #def load_modules(self):
-    #    self.loaded = True
-
-    def commit_session(self):
-        if self.database_fail:
-            raise OperationalError('Fake @ commit_session')
-        self.session = None
-
-    def connect(self, *args, **kwargs):
-        if self.db:
-            return
-        if self.database_fail:
-            raise OperationalError('Fake @ connect')
-        self.db = DB()
-
-    def map_objects(self):
-        try:
-            if self.metadata or self.loaded:
-                return True
-        except:
-            pass
-        if self.database_fail:
-            return False
-        return True
 
     def load_modules(self):
         """
@@ -101,15 +72,6 @@ class DummyServices(Services):
         #    self.subnets = Subnets(self)
         #    self.hosts = Hosts(self)
         self.loaded = True
-
-    def getSession(self):
-        if self.database_fail:
-            raise DatabaseError('Fake: Cannot get session')
-        self.session = Session()
-        return
-
-    def reconnect(self):
-        return
 
     def get_user(self, username=None):
         customer_id = None
