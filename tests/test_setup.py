@@ -3,22 +3,21 @@
 import unittest
 from services.tests.dummy.dummy_services import *
 
-import sys
-import os
-
 import signal
-
-
 
 # unittests_db contains rows
 # username = "postgres_username"
 # password = "secret"
 # server   = "postgresql-server"
 # database = "databaseforunittesting"
+# copy unittests_db.py.sample to unittests_db.py
 
-sys.path.append(os.path.join(os.environ['HOME'], "t"))
-
-import unittests_db as u
+try:
+    import unittests_db as u
+except ImportError:
+    import sys
+    print("Copy tests/unittests_db.py.sampe to tests/unittests_db.py and add username etc.")
+    sys.exit(1)
 
 class ServicesTestCase(unittest.TestCase):
 

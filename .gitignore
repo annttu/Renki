@@ -3,3 +3,4 @@ service_tester.py
 env/
 database.sql
 *.swp
+tests/unittests_db.py
