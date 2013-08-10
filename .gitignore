@@ -1,6 +1,7 @@
 service_tester.py
 *.pyc
 env/
+env*/
 database.sql
 *.swp
 tests/unittests_db.py
