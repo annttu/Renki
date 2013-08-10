@@ -3,14 +3,11 @@
 
 import unittest
 
-from services.tests.dummy.dummy_services import *
+import test_setup
+from dummy.dummy_services import *
 
-class TestDummyServices(unittest.TestCase):
+class TestDummyServices(test_setup.ServicesTestCase):
 
-    def setUp(self):
-        self.srv = DummyServices(username='unittest', password='', server='localhost',
-                                 database='services')
-        self.srv.login()
 
     def test_admin(self):
         self.assertFalse(self.srv.is_admin(), "This user should not be admin")

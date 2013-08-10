@@ -5,7 +5,6 @@ This file contains dummy implementatio of Services object to emulate real one.
 
 """
 
-
 from sqlalchemy import *
 from sqlalchemy.dialects.postgresql import *
 from sqlalchemy import event

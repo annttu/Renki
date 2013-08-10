@@ -9,6 +9,9 @@ import logging
 
 logger = logging.getLogger('libs.tools')
 
+lower = "qwertyuiopasdfghjklzxcvbnm"
+upper = "QWERTYUIOPASDFGHJKLZXCVBNM"
+
 def valid_ipv6_address(address):
     """Validate ipv6 address"""
     if re.match('^([0-9a-f]{1,4}:)(([0-9a-f]{1,4}:){5,5}[0-9a-f]{0,4}|([0-9a-f]{1,4}:){1,5}:([0-9a-f]{1,4}:){0,5}([0-9a-f]{1,4}))(/128)?$', address):
@@ -127,3 +130,22 @@ def idna_domain(domain):
 
 def is_bool(value):
     return value in [True, False]
+
+def to_int(value):
+    if value == None:
+        return
+    if isinstance(value, str) or isinstance(value, unicode):
+        if value.isdigit():
+            value = int(value)
+    if not isinstance(value, int):
+        raise ValueError("Invalid value \"%s\" for integer")
+    return value
+
+def is_local_addr(value):
+    if not isinstance(value, str) and not isinstance(value, unicode):
+        return False
+    if value in ["localhost", "127.0.0.1", "::1"]:
+        return True
+    if value.startswith("fe80:"):
+        return True
+    return False

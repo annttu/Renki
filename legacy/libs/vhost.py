@@ -11,6 +11,8 @@ from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy import MetaData, Table, Column, Integer, ForeignKey, String
 from sqlalchemy.orm import mapper, relationship
 
+from libs.tools import *
+
 # TODO
 # - add_alias()
 # - del_alias()
@@ -306,3 +308,182 @@ class Vhosts(object):
         vhost.logaccess = False
         self.main.session.commit()
         return True
+
+class Vhost(object):
+    def _init__(self, main, database_object=None):
+        if not main:
+            raise ValueError("Missing main-object")
+        self.main = main
+        if database_object:
+            self._database_object = database_object
+        else:
+            self._database_object = self.main.Vhosts()
+
+    def commit(self):
+        """
+        Commit changes to database.
+        """
+        self.main.session.add(self._database_object)
+        return self.main.safe_commit()
+
+    def delete(self):
+        """
+        Delete this vhost from database
+        """
+        if self._database_object:
+            self.main.session.delete(self._database_object)
+            return self.main.safe_commit()
+        else:
+            return True
+
+    def _get_server_by_name(self, server):
+        """
+        Get vhost server matching t_services_id
+        Raise DoesNotExist if not found
+        """
+        try:
+            retval = self.main.session.query(self.main.Services
+                    ).filter(self.main.Services.server == server,
+                    self.main.Services.service_type == 'VHOST').one()
+            # Don't leave open transactions
+            self.main.safe_commit()
+            return retval
+        except NoResultFound:
+            self.main.session.rollback()
+            raise DoesNotExist('Vhost server %s does not exist' % server)
+        return
+
+    def _get_server_by_name(self, t_services_id):
+        """
+        Get vhost server matching t_services_id
+        Raise DoesNotExist if not found
+        """
+        try:
+            retval = self.main.session.query(self.main.Services
+                    ).filter(self.main.Services.t_services_id == t_services_id,
+                    self.main.Services.service_type == 'VHOST').one()
+            # Don't leave open transactions
+            self.main.safe_commit()
+            return retval
+        except NoResultFound:
+            self.main.session.rollback()
+            raise DoesNotExist('Vhost server %s does not exist' % t_services_id)
+
+    @property
+    def t_customers_id(self):
+        return self._database_object.t_customers_id
+
+    @t_customers_id.setter
+    def t_customers_id(self):
+        if value == None:
+            return
+        value = to_int(value)
+        if value != self.main.customer_id:
+            self.main.require_admin()
+        self._database_object.t_customers_id = value
+
+    @property
+    def username(self):
+        return self._database_object.username
+
+    @username.setter
+    def username(self, value):
+        if value == None:
+            return
+        value = to_int(value)
+        if value != self.main.username:
+            self.main.require_admin()
+        self._database_object.username = value
+
+    @property
+    def name(self):
+        return self._database_object.name
+
+    @name.setter
+    def name(self, value):
+        if not isinstance(value, str) and not isinstance(value, unicode):
+            raise ValueError("Vhost name must be string")
+        if not valid_fqdn(self._domain.name + value):
+            raise ValueError("Vhost name is not valid")
+
+
+    @property
+    def aliases(self):
+        if not self._database_object.aliases:
+            return []
+        return self._database_object.aliases
+
+    @aliases.setter
+    def aliases(self, value):
+        values = []
+        if value == None:
+            self._database_objects.aliases = []
+            return True
+        if not isinstance(value, tuple) and not isinstance(value, list):
+            raise ValueError("Aliases value must be list")
+        for alias in value:
+            if not isinstance(alias,str) and not isinstance(alias, unicode):
+                raise ValueError("Aliases list contain invalid value \"%s\"")
+            alias = alias.strip()
+            if not valid_fqdn(alias) and not valid_ipv4_address(alias) and \
+                not valid_ipv6_address(alias):
+                raise ValueError("Aliases list contains invalid value \"%s\"")
+            elif is_local_addr(alias):
+                raise ValueError("Masters server address can't be localhost!")
+
+            values.append(alias)
+        self._database_object.aliases = values
+        return True
+
+    @property
+    def redirects(self):
+        if not self._database_object.redirects:
+            return []
+        return self._database_object.redirects
+
+    @redirects.setter
+    def redirects(self, value):
+        values = []
+        if value == None:
+            self._database_objects.redirects = []
+            return True
+        if not isinstance(value, tuple) and not isinstance(value, list):
+            raise ValueError("Aliases value must be list")
+        for redirect in value:
+            if not isinstance(redirect,str) and not isinstance(redirect, unicode):
+                raise ValueError("Aliases list contain invalid value \"%s\"")
+            redirect = redirect.strip()
+            if not valid_fqdn(redirect) and not valid_ipv4_address(redirect) and \
+                not valid_ipv6_address(redirect):
+                raise ValueError("Aliases list contains invalid value \"%s\"")
+            elif is_local_addr(redirect):
+                raise ValueError("Masters server address can't be localhost!")
+            values.append(redirect)
+        self._database_object.redirects = values
+        return True
+
+    @property
+    def t_services_id(self):
+        return self._database_object.t_services_id
+
+    @t_services_id.setter
+    def t_services_id(self, value):
+        try:
+            self._server = self._get_server_by_id(value)
+        except DoesNotExist as e:
+            raise ValueError(e)
+        self._database_object.t_services_id = value
+
+    @property
+    def server(self):
+        return self._server
+
+    @server.setter
+    def server(self, value):
+        if not isinstance(value, self.main.Services):
+            raise ValueError("Vhost server value must be Services object")
+        try:
+            self._server = self._get_server_by_id(value.t_services_id)
+        except DoesNotExist as e:
+            raise ValueError(e)
+        self._database_object.t_services_id = value

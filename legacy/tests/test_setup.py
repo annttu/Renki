@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # encoding: utf-8
 import unittest
-from services.tests.dummy.dummy_services import *
 
 import signal
 
@@ -11,6 +10,17 @@ import signal
 # server   = "postgresql-server"
 # database = "databaseforunittesting"
 # copy unittests_db.py.sample to unittests_db.py
+
+import sys
+import os
+
+testsdir = os.path.dirname(os.path.abspath(__file__))
+servicesdir = os.path.abspath(os.path.join(testsdir, os.path.pardir))
+parentdir = os.path.abspath(os.path.join(servicesdir, os.path.pardir))
+sys.path.insert(0, testsdir)
+sys.path.insert(0, parentdir)
+
+from dummy.dummy_services import *
 
 try:
     import unittests_db as u
@@ -69,6 +79,7 @@ class ServicesTestCase(unittest.TestCase):
 
     def tearDown(self):
         self.srv.safe_commit()
+        self.srv.session.rollback()
         self.srv.metadata.drop_all(self.srv.db)
         self.local_teardown()
         signal.alarm(0)

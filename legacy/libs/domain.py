@@ -19,7 +19,7 @@ from sqlalchemy import MetaData, Table, Column, Integer, ForeignKey
 from sqlalchemy.orm import mapper
 
 from services.libs.tools import is_int, is_bool, valid_fqdn, valid_ipv4_address, \
-                                valid_ipv6_address, idna_domain
+                                valid_ipv6_address, idna_domain, to_int
 
 from lepl.apps.rfc3696 import Email
 
@@ -241,11 +241,7 @@ class Domain(object):
     def t_customers_id(self, value):
         if value == None:
             return
-        if isinstance(value, str) or isinstance(value, unicode):
-            if value.isdigit():
-                value = int(value)
-        if not isinstance(value, int):
-            raise ValueError("t_customers_id must be integer")
+        value = to_int(value)
         if value != self.main.customer_id:
             self.main.require_admin()
         self._database_object.t_customers_id = value
