@@ -4,23 +4,26 @@
 from bottle import request, abort
 from lib.renki import app, __version__ as version
 from lib.utils import ok as ret_ok, error as ret_error
-from lib import dummy_authentication as auth
+from lib import renki_settings as settings
 from lib.exceptions import AuthenticationFailed
 
+
 import logging
+from functools import wraps
 logger = logging.getLogger('routes')
 
 
 # Authentication decorator
 def authenticated(func):
+    @wraps(func)
     def wrapped(*args, **kwargs):
         key = request.GET.get('key')
         if not key and request.json:
             key = request.json.get('key')
-        if auth.valid_key(key):
-            return func(*args, **kwargs)
-        else:
-            abort(401, "Invalid API key")
+        for mod in settings.AUTHENTICATION_MODULES:
+            if mod.valid_key(key):
+                return func(*args, **kwargs)
+        abort(401, "Invalid API key")
     return wrapped
 
 
@@ -34,8 +37,9 @@ def login_valid():
         key = request.json.get('key', '')
     if not key:
         abort(401, "key is mandatory")
-    if auth.valid_key(key):
-        return ret_ok({'message': 'Key is valid'})
+    for mod in settings.AUTHENTICATION_MODULES:
+        if mod.valid_key(key):
+            return ret_ok({'message': 'Key is valid'})
     return ret_error('Key is not valid')
 
 
@@ -46,9 +50,11 @@ def login_route():
     if not username or not password:
         username = request.json.get('username', '')
         password = request.json.get('password', '')
-    try:
-        key = auth.authenticate(username=username, password=password)
-        logger.debug("Successfully authenticated user %s" % username)
-        return ret_ok({'key': key})
-    except AuthenticationFailed as e:
-        return abort(401, e.msg)
+    for mod in settings.AUTHENTICATION_MODULES:
+        try:
+            key = mod.authenticate(username=username, password=password)
+            logger.debug("Successfully authenticated user %s" % username)
+            return ret_ok({'key': key})
+        except AuthenticationFailed:
+            pass
+    return abort(401, 'Authentication failed')

@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-from bottle import response
+from bottle import response, abort
 from lib.renki import app, __version__ as version
-from lib.utils import ok as ret_ok, error as ret_error
+from lib.utils import ok as ret_ok, error as ret_error, noauth as ret_noauth, \
+    notfound as ret_notfound, notallowed as ret_notallowed, \
+    denied as ret_denied
 import json
 
 
@@ -21,11 +23,14 @@ def version_route():
 
 
 @app.get('/error')
+@app.post('/error')
+@app.put('/error')
+@app.delete('/error')
 def error_route():
     """
     Dummy route to represent error response
     """
-    return ret_error('This route fails always, use only for testing')
+    abort(400, 'This route fails always')
 
 
 ##################
@@ -42,23 +47,31 @@ def error400(error):
 @app.error(401)
 def error401(error):
     response.content_type = 'application/json'
-    data = ret_error('Authentiation required',
-                     data={'info': str(error.body)})
+    data = ret_noauth('Authentiation required',
+                      data={'info': str(error.body)})
+    return json.dumps(data)
+
+
+@app.error(403)
+def error403(error):
+    response.content_type = 'application/json'
+    data = ret_denied('Permission denied',
+                      data={'info': str(error.body)})
     return json.dumps(data)
 
 
 @app.error(404)
 def error404(error):
     response.content_type = 'application/json'
-    data = ret_error('Requested page not found',
-                     data={'info': str(error.body)})
+    data = ret_notfound('Requested page not found',
+                        data={'info': str(error.body)})
     return json.dumps(data)
 
 
 @app.error(405)
 def error405(error):
     response.content_type = 'application/json'
-    data = ret_error(str(error.body))
+    data = ret_notallowed(str(error.body))
     return json.dumps(data)
 
 
