@@ -8,13 +8,15 @@ from lib import utils
 
 class TestDomainGetRoute(BaseRoutesTest):
     """
-    Test GET /domains/ route
+    Test GET,POST /domains/ route
     """
     ROUTINE = '/domains/'
     DEFAULT_RETVAL = APIResponses.NOAUTH
     LOGIN_REQUIRED = True
     ADMIN_REQUIRED = False
     IGNORE_TEST = False
+
+    SKIP_PUT = True
 
     GET_RETVAL = APIResponses.OK
     POST_RETVAL = APIResponses.NOTALLOWED
@@ -27,30 +29,29 @@ class TestDomainGetRoute(BaseRoutesTest):
     ANONYMOUS_PUT = APIResponses.NOAUTH
     ANONYMOUS_POST = APIResponses.NOTALLOWED
 
-
     GET_ARGS = {}
 
-    #def test_domain_get(self):
-    #    item = self.get('/domains', level=UserLevels.ANONYMOUS)
-    #    self.assertAuthFailed(item)
-    #    item = self.get('/domains', level=UserLevels.USER)
-    #    self.assertOK(item)
-    #    self.assertAuthSuccess(item)
-    #    self.assertValidJSON(item)
-    #    self.assertStatus(item, utils.OK_STATUS)
-    #    self.assertJSONValueType(item, 'domains', list)
 
-    #def test_domain_put(self):
-    #    newdomain = {'name': 'example.com', 'dns_services': True}
-    #    item = self.put('/domains/', newdomain)
-    #    self.assertAuthFailed(item)
-    #    item = self.put('/domains/', newdomain)
-    #    self.assertOK(item)
-    #    self.assertAuthSuccess(item)
-    #    self.assertJSONValueType(item, 'id', int)
-    #    self.assertJSONValueType(item, 'name', str)
-    #    self.assertJSONValueType(item, 'member', int)
-    #    self.assertJSONValueType(item, 'dns_services', bool)
+class TestDomainPutRoute(BaseRoutesTest):
+    """
+    Test PUT /domains/ route
+    """
+    ROUTINE = '/domains/'
+    DEFAULT_RETVAL = APIResponses.NOAUTH
+    LOGIN_REQUIRED = True
+    ADMIN_REQUIRED = False
+    IGNORE_TEST = False
+
+    SKIP_GET = True
+    SKIP_POST = True
+    SKIP_DELETE = True
+
+    PUT_RETVAL = APIResponses.OK
+
+    ANONYMOUS_DEFAULT = APIResponses.NOAUTH
+    ANONYMOUS_PUT = APIResponses.NOAUTH
+
+    PUT_ARGS = {'name': 'example.com', 'member': 0, 'dns_services': True}
 
 if __name__ == '__main__':
     unittest.main()

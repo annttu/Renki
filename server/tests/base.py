@@ -69,10 +69,10 @@ class BaseRoutesTest(unittest.TestCase):
     IGNORE_TEST = False
 
     ROUTINE = None
-    POST_ARGS = []
-    GET_ARGS = []
-    PUT_ARGS = []
-    DELETE_ARGS = []
+    POST_ARGS = {}
+    GET_ARGS = {}
+    PUT_ARGS = {}
+    DELETE_ARGS = {}
 
     DEFAULT_RETVAL = APIResponses.OK
     GET_RETVAL = APIResponses.DEFAULT
@@ -100,6 +100,13 @@ class BaseRoutesTest(unittest.TestCase):
     ADMIN_PUT = APIResponses.DEFAULT
     ADMIN_GET = APIResponses.DEFAULT
     ADMIN_DELETE = APIResponses.DEFAULT
+
+    # Skip some tests
+    # Useful if methods are tested manually or in another module
+    SKIP_GET = False
+    SKIP_POST = False
+    SKIP_PUT = False
+    SKIP_DELETE = False
 
     @classmethod
     def setUpClass(cls):
@@ -129,10 +136,18 @@ class BaseRoutesTest(unittest.TestCase):
             self.adminkey = r.json['key']
 
     def _getKey(self, params={}, level=UserLevels.ANONYMOUS):
+        """
+        Add or remove key from params according to level
+        @returns: modifed params dictionary (Copied)
+        """
+        # This prevents key from leaking to method_ARGS
+        params = params.copy()
         if level == UserLevels.USER:
             params['key'] = self.userkey
         elif level == UserLevels.ADMIN:
             params['key'] = self.adminkey
+        elif 'key' in params:
+            del params['key']
         return params
 
     def get(self, url, params={}, level=UserLevels.ANONYMOUS):
@@ -277,6 +292,9 @@ class BaseRoutesTest(unittest.TestCase):
             print("Skipping")
             unittest.skip('Ignored test')
             return
+        if getattr(self, 'SKIP_%s' % method) is True:
+            unittest.skip('Ignored by SKIP_%s' % method)
+            return
         if not args:
             args = getattr(self, '%s_ARGS' % method)
         if level in ['USER', 'ANONYMOUS', 'ADMIN']:
@@ -286,7 +304,7 @@ class BaseRoutesTest(unittest.TestCase):
                                level=level_enum)
         elif method == 'POST':
             item = self.post(self.ROUTINE, data=args,
-                            level=level_enum)
+                             level=level_enum)
         elif method == 'PUT':
             item = self.put(self.ROUTINE, data=args,
                             level=level_enum)
@@ -308,30 +326,77 @@ class BaseRoutesTest(unittest.TestCase):
         else:
             raise AssertionError('Invalid excepted value %s' % excepted)
 
-    #@unittest.skipIf(module_name() == 'base.py',  'Base test')
+    # Anonymous tests with valid input values
     def test_anonymous_get(self):
         """
         Test get as anonymous user
         """
         self.do_test('GET', 'ANONYMOUS')
 
-    #@unittest.skipIf(module_name() == 'base.py',  'Base test')
     def test_anonymous_put(self):
         """
         Test put as anonymous user
         """
         self.do_test('PUT', 'ANONYMOUS')
 
-    #@unittest.skipIf(module_name() == 'base.py',  'Base test')
     def test_anonymous_post(self):
         """
         Test post as anonymous user
         """
         self.do_test('POST', 'ANONYMOUS')
 
-    #@unittest.skipIf(module_name() == 'base.py',  'Base test')
     def test_anonymous_delete(self):
         """
         Test delete as anonymous user
         """
         self.do_test('DELETE', 'ANONYMOUS')
+
+    # Run tests with authenticated user and valid input
+    def test_user_get(self):
+        """
+        Test get as normal user
+        """
+        self.do_test('GET', 'USER')
+
+    def test_user_put(self):
+        """
+        Test put as normal user
+        """
+        self.do_test('PUT', 'USER')
+
+    def test_user_post(self):
+        """
+        Test post as normal user
+        """
+        self.do_test('POST', 'USER')
+
+    def test_user_delete(self):
+        """
+        Test delete as normal user
+        """
+        self.do_test('DELETE', 'USER')
+
+    # Run tests with admin user and valid input
+    def test_admin_get(self):
+        """
+        Test get as normal user
+        """
+        self.do_test('GET', 'ADMIN')
+
+    def test_admin_put(self):
+        """
+        Test put as normal user
+        """
+        self.do_test('PUT', 'ADMIN')
+
+    def test_admin_post(self):
+        """
+        Test post as normal user
+        """
+        self.do_test('POST', 'ADMIN')
+
+    def test_admin_delete(self):
+        """
+        Test delete as normal user
+        """
+        self.do_test('DELETE', 'ADMIN')
