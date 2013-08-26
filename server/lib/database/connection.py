@@ -4,6 +4,7 @@
 This file is part of Renki project
 """
 
+from .tables import TABLES
 from sqlalchemy import create_engine
 from sqlalchemy.engine import url
 from sqlalchemy.schema import MetaData
@@ -28,6 +29,7 @@ class DBConnection(object):
         self.__base = None
         self._echo = echo
         self.connect()
+        self._register_tables()
 
     @property
     def _session(self):
@@ -63,7 +65,7 @@ class DBConnection(object):
         """
         Initialize session
         """
-        Session = sessionmaker(bind=self._engine)
+        Session = sessionmaker(bind=self._engine, autocommit=False)
         self.__session = Session()
 
     def _create_engine(self):
@@ -76,11 +78,30 @@ class DBConnection(object):
                         port=self._port)
         self.__engine = create_engine(dburl, echo=self._echo)
 
+    def _register_tables(self):
+        """
+        Register this connection to all databases
+        """
+        for table in TABLES:
+            table._conn = self
+
     def connect(self):
         """
         Connect to database
         """
         self._create_session()
+
+    def create_tables(self):
+        """
+        Create all tables
+        """
+        self._metadata.create_all()
+
+    def drop_tables(self):
+        """
+        Drop all tables
+        """
+        self._metadata.drop_all()
 
     def register_table(self, table, name=None):
         """
