@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # encoding: utf-8
 
 from bottle import request, abort
@@ -15,6 +14,9 @@ logger = logging.getLogger('routes')
 
 # Authentication decorator
 def authenticated(func):
+    """
+    Ensure user has authenticated
+    """
     @wraps(func)
     def wrapped(*args, **kwargs):
         key = request.GET.get('key')
@@ -53,7 +55,7 @@ def login_route():
     for mod in settings.AUTHENTICATION_MODULES:
         try:
             key = mod.authenticate(username=username, password=password)
-            logger.debug("Successfully authenticated user %s" % username)
+            logger.debug("User %s has successfully authenticated" % username)
             return ret_ok({'key': key})
         except AuthenticationFailed:
             pass

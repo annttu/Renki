@@ -10,6 +10,16 @@ BIND_PORT = 8080
 
 AUTHENTICATION_MODULES = ('lib.auth.dummy.AuthenticationModule',)
 
+################
+### Database ###
+################
+
+DB_DATABASE = 'renki'
+DB_USER = 'renki'
+DB_PASSWORD = 'secret'
+DB_SERVER = 'localhost'
+DB_PORT = 5432
+
 ###############
 ### Logging ###
 ###############
@@ -53,3 +63,7 @@ LOGGING = {
      }
 }
 
+try:
+    from local_settings import *
+except ImportError:
+    pass
