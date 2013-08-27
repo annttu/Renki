@@ -20,8 +20,8 @@ EXAMPLE_DOMAIN = {
                  }
 
 
-@renki.get('/domains')
-@renki.get('/domains/')
+@renki.route('/domains', method='GET')
+@renki.route('/domains/', method='GET')
 @authenticated
 def domains_route():
     return ok({'domains': [EXAMPLE_DOMAIN]})

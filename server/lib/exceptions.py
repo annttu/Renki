@@ -21,5 +21,12 @@ class AlreadyExist(RenkiException):
     pass
 
 
+class DoesNotExist(RenkiException):
+    pass
+
 class AuthenticationFailed(RenkiException):
+    pass
+
+
+class SettingError(RenkiException):
     pass

@@ -2,32 +2,62 @@
 # encoding: utf-8
 
 import unittest
-from tests.base import TestRoutes
-from lib import utils, renki
+from tests.base import BaseRoutesTest, APIResponses
 
 
-class TestGenericRoutes(TestRoutes):
+class TestIndexRoute(BaseRoutesTest):
     """
-    Test server user routes
+    Test / route
     """
-    def test_index(self):
-        item = self.get('/')
-        self.assertValidJSON(item)
-        self.assertStatus(item, utils.OK_STATUS)
+    LOGIN_REQUIRED = False
+    ROUTINE = '/'
+    DEFAULT_RETVAL = APIResponses.OK
+    POST_RETVAL = APIResponses.NOTALLOWED
+    PUT_RETVAL = APIResponses.NOTALLOWED
+    DELETE_RETVAL = APIResponses.NOTALLOWED
+    IGNORE_TEST = False
 
-    def test_version(self):
-        item = self.get('/version')
-        self.assertValidJSON(item)
-        self.assertOK(item)
-        self.assertStatus(item, utils.OK_STATUS)
-        self.assertJSONValue(item, 'version', renki.__version__)
 
-    def test_error(self):
-        item = self.get('/error')
-        self.assertValidJSON(item)
-        self.assertOK(item)
-        self.assertStatus(item, utils.ERROR_STATUS)
-        self.assertJSONContains(item, 'error')
+class TestVersionRoute(BaseRoutesTest):
+    """
+    Test /versin route
+    """
+    LOGIN_REQUIRED = False
+    ROUTINE = '/version'
+    DEFAULT_RETVAL = APIResponses.OK
+    POST_RETVAL = APIResponses.NOTALLOWED
+    PUT_RETVAL = APIResponses.NOTALLOWED
+    DELETE_RETVAL = APIResponses.NOTALLOWED
+    IGNORE_TEST = False
+
+    RESPONSE_SCHEMA = {
+        'type': "object",
+        'properties': {
+            'version': {'type': 'string'},
+        },
+        'required': ['version']
+    }
+
+
+class TestErrorRoute(BaseRoutesTest):
+    """
+    Test /error route
+    """
+    LOGIN_REQUIRED = False
+    ROUTINE = '/error'
+    DEFAULT_RETVAL = APIResponses.ERROR
+    POST_RETVAL = APIResponses.ERROR
+    PUT_RETVAL = APIResponses.ERROR
+    DELETE_RETVAL = APIResponses.ERROR
+    IGNORE_TEST = False
+
+    RESPONSE_SCHEMA = {
+        'type': "object",
+        'properties': {
+            'version': {'type': 'string'},
+        },
+        'required': ['version']
+    }
 
 if __name__ == '__main__':
     unittest.main()
