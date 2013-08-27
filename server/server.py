@@ -4,6 +4,7 @@
 from lib import renki, renki_settings as settings
 from lib.database.connection import DBConnection
 import routes
+import modules
 
 from bottle import run
 import logging

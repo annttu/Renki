@@ -1,13 +1,13 @@
 # encoding: utf-8
 
 
-from lib.database.table import RenkiTable
+from lib.database.table import RenkiTable, RenkiBase
 from lib.exceptions import Invalid
 from lib.database.tables import register_table
 from sqlalchemy import Column, String
 
 
-class Repository(RenkiTable):
+class Repository(RenkiBase, RenkiTable):
     __tablename__ = 'repository'
     name = Column(String(512))
 

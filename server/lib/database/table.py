@@ -17,7 +17,6 @@ class RenkiTable(object):
 
     @classmethod
     def get(cls, id_):
-        print(cls.__class__.__name__)
         if id_:
             try:
                 id_ = int(id_)
@@ -25,17 +24,16 @@ class RenkiTable(object):
                 logger.error("Get with invalid database id %s" % id_)
                 raise Invalid('ID must be integer')
             try:
-                this = cls.__class__
-                c = cls._conn._session.query(this).filter(
-                    this.id==id_).one()
+                c = cls._conn._session.query(cls).filter(
+                    cls.id==id_).one()
             except NoResultFound:
                 raise DoesNotExist('Object with id %d does not exist' %
                                    id_)
             except SQLAlchemyError as e:
                 logger.exception(e)
                 raise DatabaseError('Cannot get object with id %d' % id_)
-            print(dir(c))
-            #for
+            return c
+        raise Invalid('ID must be integer')
 
 
     def validate(self):
@@ -60,4 +58,4 @@ class RenkiTable(object):
         self.validate()
         return True
 
-RenkiTable = declarative_base(cls=RenkiTable)
+RenkiBase = declarative_base(cls=RenkiTable)
