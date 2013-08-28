@@ -109,7 +109,7 @@ class RenkiClient(object):
         ret = self._session.put(self._abs_url(path), params=params)
         return self._process(ret)
 
-    def deleste(self, path, params={}):
+    def delete(self, path, params={}):
         """
         @param path: API path, eg. domain
         @type path: string
