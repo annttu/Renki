@@ -12,7 +12,11 @@ class RenkiClient(object):
     >>> r = RenkiClient('http://localhost:8080/')
     >>> r.authenticate('test', 'test')
     >>> r.get('/domains')
-
+    {'domains': [
+           {'member': 1, 'dns_services': True, 'id': 1, 'name': 'example.com'}
+        ],
+     'status': 'OK'
+    }
     """
     def __init__(self, address):
         """
