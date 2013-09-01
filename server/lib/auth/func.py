@@ -9,11 +9,11 @@ logger = logging.getLogger('authentication')
 
 
 # Authentication decorator
-def authenticated(func=None, user=False):
+def authenticated(func=None, injectuser=False):
     """
     Ensure user has authenticated
 
-    @param user: If true, user information is given as request param
+    @param injectuser: If true, user information is given as request param
     """
     def outer_wrapper(func):
         @wraps(func)
@@ -21,7 +21,8 @@ def authenticated(func=None, user=False):
             key = get_apikey(request)
             for mod in settings.AUTHENTICATION_MODULES:
                 if mod.valid_key(key):
-                    kwargs['user'] = mod.get_user(key)
+                    if injectuser:
+                        kwargs['user'] = mod.get_user(key)
                     return func(*args, **kwargs)
             abort(401, "Invalid API key")
         return wrapped
