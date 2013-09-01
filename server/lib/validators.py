@@ -25,15 +25,29 @@ def validate_domain(domain):
     return True
 
 
-def validate_mid(mid):
+def validate_userid(mid):
     """
-    Validate member id
+    Validate userid
 
-    @param mid: Member id
-    @type mid: str
+    @param userid: User id
+    @type userid: int
     """
     if not isinstance(mid, int):
         raise Invalid("Member id is always integer")
     if mid < 0:
         raise Invalid("Member id is always positive integer")
+    return True
+
+
+def validate_boolean(value, name='Value'):
+    """
+    Validate value is boolean
+
+    @param value: Value to test
+    @type value: boolean
+    @param name: Value name
+    @type name: str
+    """
+    if not isinstance(value, bool):
+        raise Invalid("%s must be boolean" % name)
     return True

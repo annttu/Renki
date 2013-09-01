@@ -44,7 +44,6 @@ LOGGING = {
             'class': 'logging.NullHandler',
         },
         'console': {
-            'level': 'INFO',
             'class': 'logging.StreamHandler',
             'formatter': 'simple'
         }
@@ -64,6 +63,16 @@ LOGGING = {
             'handlers': ['console'],
             'propagate': True,
             'level': 'INFO',
+        },
+        'create_tables': {
+            'handlers': ['console'],
+            'propagate': True,
+            'level': 'INFO',
+        },
+        'dbconnection': {
+            'handlers': ['console'],
+            'propagate': True,
+            'level': 'DEBUG',
         }
      }
 }

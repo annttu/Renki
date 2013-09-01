@@ -14,6 +14,9 @@ class RenkiTable(object):
     id = Column(Integer(), primary_key=True, nullable=False)
     _conn = None
 
+    @classmethod
+    def query(cls):
+        return cls._conn.query(cls)
 
     @classmethod
     def get(cls, id_):
@@ -24,7 +27,7 @@ class RenkiTable(object):
                 logger.error("Get with invalid database id %s" % id_)
                 raise Invalid('ID must be integer')
             try:
-                c = cls._conn._session.query(cls).filter(
+                c = cls._conn.query(cls).filter(
                     cls.id==id_).one()
             except NoResultFound:
                 raise DoesNotExist('Object with id %d does not exist' %

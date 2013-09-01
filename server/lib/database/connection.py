@@ -10,6 +10,8 @@ from sqlalchemy.engine import url
 from sqlalchemy.schema import MetaData
 from sqlalchemy.orm import sessionmaker
 
+import logging
+logger = logging.getLogger('dbconnection')
 
 class DBConnection(object):
     def __init__(self, database, username, password, host, port=5432,
@@ -54,6 +56,18 @@ class DBConnection(object):
         if not self.__engine:
             self._create_engine()
         return self.__engine
+
+    @property
+    def query(self):
+        return self._session.query
+
+    @property
+    def add(self):
+        return self._session.add
+
+    @property
+    def commit(self):
+        return self._session.commit
 
     def _create_metadata(self):
         """
@@ -117,6 +131,7 @@ class DBConnection(object):
         table.parent = self
         self.tables[name] = table
         if name not in vars(self):
+            logger.debug('Registering table %s' % name)
             setattr(DBConnection, name, table)
 
     def __str__(self):

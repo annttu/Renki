@@ -2,14 +2,15 @@
 
 
 from lib.database.table import RenkiTable, RenkiBase
-from lib.exceptions import Invalid
 from lib.database.tables import register_table
-from sqlalchemy import Column, String
+from lib.exceptions import Invalid
+from sqlalchemy import Column, String, Integer
 
 
-class Repository(RenkiBase, RenkiTable):
+class RepositoryDatabase(RenkiBase, RenkiTable):
     __tablename__ = 'repository'
-    name = Column(String(512))
+    name = Column('name', String(512), nullable = False)
+    userid = Column('userid', Integer, nullable=False)
 
     def validate(self):
         if len(self.name) > 50:
@@ -17,10 +18,10 @@ class Repository(RenkiBase, RenkiTable):
         return True
 
     def save(self):
-        super(Repository, self).save()
-        self._conn._session.add(self)
-        self._conn._session.commit()
+        super(RepositoryDatabase, self).save()
+        self._conn.add(self)
+        self._conn.commit()
 
 
 # Register table
-register_table(Repository)
+register_table(RepositoryDatabase)
