@@ -1,7 +1,8 @@
 # encoding: utf-8
 
 from .exceptions import NotAuthorized, NotFound, NotAuthenticated, \
-    InvalidResponse, RenkiException, ServerError
+    InvalidResponse, RenkiException, ServerError, AuthenticationFailed, \
+    HTTPException
 import requests
 
 
@@ -24,9 +25,10 @@ class RenkiClient(object):
         @type address: string
         """
         self.address = address.rstrip('/')
-        self._session = requests.Session()
         self._authkey = None
-
+        self._session = requests.Session()
+        headers = {'User-Agent': 'RenkiClient v0.1'}
+        self._session.headers = headers
 
     def authenticate(self, username, password):
         """
@@ -36,12 +38,17 @@ class RenkiClient(object):
         @param passoword: User password
         @type password: string
         """
+        credentials = {'username': username, 'password': password}
+        ret = {}
         try:
-            ret = self.post('/login', {'username': 'test', 'password': 'test'})
+            ret = self.post('/login', credentials)
         except NotAuthenticated:
             pass
+        except HTTPException:
+            raise AuthenticationFailed(
+                    'Cannot authenticate due to server error')
         if 'key' not in ret:
-            raise RenkiException('Invalid username or password')
+            raise AuthenticationFailed('Username or password invalid')
         self._session.params = {'key': ret['key']}
 
     def _process(self, res):

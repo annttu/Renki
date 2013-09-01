@@ -31,6 +31,13 @@ class NotAuthorized(HTTPException):
     pass
 
 
+class AuthenticationFailed(HTTPException):
+    code = 401
+    """
+    User authentication failed
+    """
+    pass
+
 class NotFound(HTTPException):
     code = 404
     """
