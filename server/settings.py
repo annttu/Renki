@@ -8,7 +8,7 @@ BIND_PORT = 8080
 ### Authentication ###
 ######################
 
-AUTHENTICATION_MODULES = ('lib.auth.dummy.AuthenticationModule',)
+AUTHENTICATION_MODULES = ('lib.auth.dummy.DummyAuthenticationModule',)
 
 ################
 ### Database ###
@@ -56,6 +56,11 @@ LOGGING = {
             'level': 'INFO',
         },
         'server': {
+            'handlers': ['console'],
+            'propagate': True,
+            'level': 'INFO',
+        },
+        'login_routes': {
             'handlers': ['console'],
             'propagate': True,
             'level': 'INFO',

@@ -3,15 +3,16 @@
 
 from bottle import response, abort
 from lib.renki import app
-from lib.utils import ok as ret_ok, error as ret_error
-from routes.login_routes import authenticated
+from lib.utils import ok, error
+from lib.auth.func import authenticated
 import json
 
 
 @app.get('/repositories')
+@app.get('/repositories/')
 @authenticated
 def repositories_index():
     """
     GET /repositories
     """
-    return ret_ok({'svn': [], 'git': []})
+    return ok({'svn': [], 'git': []})

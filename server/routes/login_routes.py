@@ -8,25 +8,7 @@ from lib.exceptions import AuthenticationFailed
 
 
 import logging
-from functools import wraps
-logger = logging.getLogger('routes')
-
-
-# Authentication decorator
-def authenticated(func):
-    """
-    Ensure user has authenticated
-    """
-    @wraps(func)
-    def wrapped(*args, **kwargs):
-        key = request.GET.get('key')
-        if not key and request.json:
-            key = request.json.get('key')
-        for mod in settings.AUTHENTICATION_MODULES:
-            if mod.valid_key(key):
-                return func(*args, **kwargs)
-        abort(401, "Invalid API key")
-    return wrapped
+logger = logging.getLogger('login_routes')
 
 
 @app.get('/login/valid')
@@ -55,7 +37,7 @@ def login_route():
     for mod in settings.AUTHENTICATION_MODULES:
         try:
             key = mod.authenticate(username=username, password=password)
-            logger.debug("User %s has successfully authenticated" % username)
+            logger.info("User %s has successfully authenticated" % username)
             return ret_ok({'key': key})
         except AuthenticationFailed:
             pass
