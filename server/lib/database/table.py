@@ -2,6 +2,7 @@
 
 from lib.exceptions import Invalid, DoesNotExist, DatabaseError
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.schema import MetaData
 from sqlalchemy import Column, Integer
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.exc import SQLAlchemyError
@@ -61,4 +62,20 @@ class RenkiTable(object):
         self.validate()
         return True
 
-RenkiBase = declarative_base(cls=RenkiTable)
+    def as_dict(self):
+        """
+        Return this object columns as dict object
+        """
+        ret = {}
+        for i in self.__table__.columns.keys():
+            ret[i] = getattr(self, i)
+        return ret
+
+# RenkiUserTable contains userid
+
+class RenkiUserTable(RenkiTable):
+    userid = Column('userid', Integer, nullable=False)
+
+
+metadata = MetaData()
+RenkiBase = declarative_base(cls=RenkiTable, metadata=metadata)
