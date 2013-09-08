@@ -69,7 +69,9 @@ class RenkiClient(object):
         except KeyError:
             raise InvalidResponse("Got invalid response from server")
 
-        if code == 401 or status == 'NOAUTH':
+        if code == 400 or status == 'ERROR':
+            raise RenkiException(error)
+        elif code == 401 or status == 'NOAUTH':
             raise NotAuthenticated(error)
         elif code == 403 or status == 'DENIED':
             raise NotAuthorized(error)
