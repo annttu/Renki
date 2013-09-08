@@ -9,7 +9,7 @@ logger = logging.getLogger('authentication')
 
 
 # Authentication decorator
-def authenticated(func=None, injectuser=False):
+def authenticated(func=None, inject_user=False):
     """
     Ensure user has authenticated
 
@@ -21,7 +21,7 @@ def authenticated(func=None, injectuser=False):
             key = get_apikey(request)
             for mod in settings.AUTHENTICATION_MODULES:
                 if mod.valid_key(key):
-                    if injectuser:
+                    if inject_user:
                         kwargs['user'] = mod.get_user(key)
                     return func(*args, **kwargs)
             abort(401, "Invalid API key")

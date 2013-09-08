@@ -5,6 +5,8 @@ This file is part of Renki project
 """
 
 from .tables import TABLES
+from .table import metadata
+
 from sqlalchemy import create_engine
 from sqlalchemy.engine import url
 from sqlalchemy.schema import MetaData
@@ -71,9 +73,11 @@ class DBConnection(object):
 
     def _create_metadata(self):
         """
-        Create SQLAlchemy metadata
+        Create SQLAlchemy metadata using same metadata object as with tables.
         """
-        self.__metadata = MetaData(self._engine)
+        self.__metadata = metadata
+        # Bind engine to this connction
+        self.__metadata._bind_to(self._engine)
 
     def _create_session(self):
         """

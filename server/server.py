@@ -8,7 +8,6 @@ import modules
 
 from bottle import run
 import logging
-import logging.config
 
 if __name__ == '__main__':
     logger = logging.getLogger('server')

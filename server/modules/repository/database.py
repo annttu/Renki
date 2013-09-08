@@ -1,16 +1,15 @@
 # encoding: utf-8
 
 
-from lib.database.table import RenkiTable, RenkiBase
+from lib.database.table import RenkiUserTable, RenkiBase
 from lib.database.tables import register_table
 from lib.exceptions import Invalid
-from sqlalchemy import Column, String, Integer
+from sqlalchemy import Column, String
 
 
-class RepositoryDatabase(RenkiBase, RenkiTable):
+class RepositoryDatabase(RenkiBase, RenkiUserTable):
     __tablename__ = 'repository'
     name = Column('name', String(512), nullable = False)
-    userid = Column('userid', Integer, nullable=False)
 
     def validate(self):
         if len(self.name) > 50:
