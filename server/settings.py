@@ -73,6 +73,11 @@ LOGGING = {
             'handlers': ['console'],
             'propagate': True,
             'level': 'DEBUG',
+        },
+        'database/routes': {
+            'handlers': ['console'],
+            'propagate': True,
+            'level': 'DEBUG',
         }
      }
 }
