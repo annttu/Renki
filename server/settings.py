@@ -1,7 +1,7 @@
 # encoding: utf-8
 
 DEBUG = True
-BIND_HOST = 'localhost'
+BIND_HOST = '127.0.0.1'
 BIND_PORT = 8080
 
 ######################
@@ -17,7 +17,7 @@ AUTHENTICATION_MODULES = ('lib.auth.dummy.DummyAuthenticationModule',)
 DB_DATABASE = 'renki'
 DB_USER = 'renki'
 DB_PASSWORD = 'secret'
-DB_SERVER = 'localhost'
+DB_SERVER = '127.0.0.1'
 DB_PORT = 5432
 
 ###############
