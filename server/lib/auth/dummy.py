@@ -2,11 +2,21 @@
 
 from lib.exceptions import AuthenticationFailed
 from lib.utils import generate_key
-from lib.auth.authentication import User, Key, AuthenticationModule
+from lib.auth.authentication import User, Key, AuthenticationModule,\
+     PermissionGroup
 
 """
 Dummy authentication module
 """
+
+dummyAdminGroup = PermissionGroup(name='admin', permissions=['domain_view_all',
+                                  'domain_modify_all', 'vhost_view_all',
+                                  'vhost_modify_all'])
+
+dummyUserGroup = PermissionGroup(name='user', permissions=['domain_view_own',
+                                 'domain_modify_own', 'vhost_view_own',
+                                 'vhost_modify_own'])
+
 
 class DummyAuthenticationModule(AuthenticationModule):
     NAME = "DUMMY"
@@ -20,14 +30,14 @@ class DummyAuthenticationModule(AuthenticationModule):
         returns api key if credentials are correct
         """
         if username == 'test' and password == 'test':
-            user = User(userid=2, username=username, firstnames='Teemu',
-                        lastname='Testaaja', level='USER')
+            user = User(user_id=2, username=username, firstnames='Teemu',
+                        lastname='Testaaja', groups=[dummyUserGroup])
             key = Key(generate_key(), user=user)
             self.keys.append(key)
             return key.key
         elif username == 'admin' and password == 'admin':
-            user = User(userid=1, username=username, firstnames='Antero',
-                        lastname='Ylläpitäjä', level='ADMIN')
+            user = User(user_id=1, username=username, firstnames='Antero',
+                        lastname='Ylläpitäjä', groups=[dummyAdminGroup])
             key = Key(generate_key(), user=user)
             self.keys.append(key)
             return key.key

@@ -7,18 +7,36 @@ from lib.exceptions import AuthenticationFailed
 Authentication related modules
 """
 
+class PermissionGroup(object):
+    def __init__(self, name, permissions=[]):
+        self.name = name
+        self.permissions = permissions
+
+    def has_permission(self, perm):
+        return perm in self.permissions
+
+    def __str__(self):
+        return "PermissionGroup: %s" % self.name
 
 class User(object):
-    def __init__(self, userid, username, firstnames, lastname, level='USER'):
-        self.userid = userid
+    def __init__(self, user_id, username, firstnames, lastname, groups=[]):
+        self.user_id = user_id
         self.username = username
         self.firstnames = firstnames
         self.lastnames = lastname
-        self.level = level
+        self.groups = groups
+        self.superuser = False
 
     def get_full_name(self):
         return self.firstnames + " " + self.lastnames
 
+    def has_permission(self, perm):
+        if self.superuser:
+            return True
+        for group in self.groups:
+            if group.has_permission(perm) is True:
+                return True
+        return False
 
 class Key(object):
     def __init__(self, key, user):
@@ -26,11 +44,7 @@ class Key(object):
         self.user = user
 
     def has_permission(self, permission):
-        if permission == 'USER':
-            return self.user.level in ['USER', 'ADMIN']
-        elif permission == 'ADMIN':
-            return self.user.level == 'ADMIN'
-        return False
+        return self.user.have_permission(permission)
 
     def get_user(self):
         return self.user
@@ -47,7 +61,7 @@ class AuthenticationModule(object):
                 return k
         return None
 
-    def has_perm(self, key, perm):
+    def has_permission(self, key, perm):
         """
         Returns True if user has permission perm
         else returns False
