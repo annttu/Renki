@@ -50,6 +50,7 @@ class RenkiClient(object):
         if 'key' not in ret:
             raise AuthenticationFailed('Username or password invalid')
         self._session.params = {'key': ret['key']}
+    auth = authenticate
 
     def _process(self, res):
         """
