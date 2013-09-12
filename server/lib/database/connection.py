@@ -32,7 +32,10 @@ class DBConnection(object):
         self.__metadata = None
         self.__base = None
         self._echo = echo
+        logger.info("Connecting to database")
         self.connect()
+        self._engine.connect()
+        logger.info("Database connection initialized")
         self._register_tables()
 
     @property
@@ -76,7 +79,7 @@ class DBConnection(object):
         Create SQLAlchemy metadata using same metadata object as with tables.
         """
         self.__metadata = metadata
-        # Bind engine to this connction
+        # Bind engine to this connection
         self.__metadata._bind_to(self._engine)
 
     def _create_session(self):
@@ -94,7 +97,7 @@ class DBConnection(object):
                         username=self._username, password=self._password,
                         host=self._host, database=self._database,
                         port=self._port)
-        self.__engine = create_engine(dburl, echo=self._echo)
+        self.__engine = create_engine(dburl, echo=self._echo, pool_timeout=10)
 
     def _register_tables(self):
         """

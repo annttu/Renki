@@ -74,7 +74,7 @@ class RenkiTable(object):
 # RenkiUserTable contains userid
 
 class RenkiUserTable(RenkiTable):
-    userid = Column('userid', Integer, nullable=False)
+    user_id = Column('user_id', Integer, nullable=False)
 
 
 metadata = MetaData()

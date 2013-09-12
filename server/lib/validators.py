@@ -39,6 +39,13 @@ def validate_userid(mid):
     return True
 
 
+def is_boolean(value):
+    """
+    Test if value is boolean
+    """
+    return isinstance(value, bool)
+
+
 def validate_boolean(value, name='Value'):
     """
     Validate value is boolean
@@ -51,3 +58,29 @@ def validate_boolean(value, name='Value'):
     if not isinstance(value, bool):
         raise Invalid("%s must be boolean" % name)
     return True
+
+
+def is_int(value):
+    """
+    test if value is integer
+
+    @param value: value to test
+    @type value: int
+    """
+    try:
+        int(value)
+    except ValueError:
+        return False
+    return True
+
+
+def is_positive_int(value):
+    """
+    Validate value is positive integer
+
+    @param value: value to test
+    """
+    if is_int(value) is True:
+        if int(value) >= 0:
+            return True
+    return False
