@@ -79,6 +79,9 @@ def domains_put_route(user):
     for value in required_params:
         if value not in data:
             abort(400, '%s is mandatory value!')
+    for value in data:
+        if value not in required_params:
+            abort(400, "%s is unknown value!" % value)
     try:
         if modify_all:
             domain = add_user_domain(user_id=data['user_id'],
