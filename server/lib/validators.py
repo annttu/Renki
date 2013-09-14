@@ -28,7 +28,6 @@ def validate_domain(domain, name='Value'):
         raise Invalid("Domain contains invalid characters")
 
 
-
 def validate_user_id(mid):
     """
     Validate user_id
@@ -100,19 +99,24 @@ def validate_positive_int(value, name="Value"):
         return int(value)
     raise Invalid("%s must be positive integer" % name)
 
-def is_positive_numeric(value):
+def is_positive_numeric(value, zero_included=True):
     """
-    Test if value is a positive numeric (zero-included)
+    Test if value is a positive numeric
 
     @param value: value to test
+    @param zero_included: is zero included?
     @type value: any
     """
     try:
         value_parsed = int(value)
-        if value_parsed >= 0:
-            return True
+        if zero_included:
+            if value_parsed >= 0:
+                return True
         else:
-            return False
+            if value_parsed > 0:
+                return True
+
+        return False
     except:
         return False
 
