@@ -124,3 +124,20 @@ def cast_as_int(value):
         return (True, casted)
     except:
         return (False, None)
+
+def is_numeric_in_range(value, min, max):
+    """
+    Test if value is numeric and in range
+
+    @param value: input value
+    @param min: minimum
+    @param max: maximum
+    """
+    try:
+        value_parsed = int(value)
+        if value_parsed in range(min,max):
+            return True
+        else:
+            return False
+    except:
+        return False

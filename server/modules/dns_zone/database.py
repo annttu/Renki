@@ -6,6 +6,7 @@ Database objects for dns_zone
 
 from lib.database.table import RenkiBase, RenkiTable
 from sqlalchemy import Column,String,Boolean,Integer,ForeignKey
+from sqlalchemy.orm import relationship
 from lib.database.tables import register_table
 
 class DNSZoneDatabase(RenkiBase, RenkiTable):
@@ -34,7 +35,7 @@ class DNSEntryDatabase(RenkiBase, RenkiTable):
 
     key         = Column('key',         String,     nullable=False)
     record_type = Column('record_type', String,     nullable=False)
-    ttl         = Column('ttl',         Integer,    nullable=False)
+    ttl         = Column('ttl',         Integer,    nullable=True)
     value       = Column('value',       String,     nullable=False)
     priority    = Column('priority',    Integer,    nullable=True,  default=None)
 
