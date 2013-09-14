@@ -9,6 +9,10 @@ Client
 ======
 Simple client library for Renki.
 
+
+License
+=======
+
 Renki is licensed under MIT-license
 
 Copyright (c) 2012-2013 Kapsi Internet-käyttäjät ry
