@@ -6,6 +6,7 @@ from lib.renki import app, __version__ as version
 from lib.utils import ok as ret_ok, error as ret_error, noauth as ret_noauth, \
     notfound as ret_notfound, notallowed as ret_notallowed, \
     denied as ret_denied, conflict as ret_conflict
+from lib.database import connection
 import json
 
 
@@ -51,6 +52,7 @@ def get_error_str(error):
 
 @app.error(400)
 def error400(error):
+    connection.conn.rollback()
     response.content_type = 'application/json'
     data = ret_error('Request is invalid', data={'info': get_error_str(error)})
     return json.dumps(data)
@@ -58,6 +60,7 @@ def error400(error):
 
 @app.error(401)
 def error401(error):
+    connection.conn.rollback()
     response.content_type = 'application/json'
     data = ret_noauth('Authentiation required',
                       data={'info': get_error_str(error)})
@@ -66,6 +69,7 @@ def error401(error):
 
 @app.error(403)
 def error403(error):
+    connection.conn.rollback()
     response.content_type = 'application/json'
     data = ret_denied('Permission denied',
                       data={'info': get_error_str(error)})
@@ -74,6 +78,7 @@ def error403(error):
 
 @app.error(404)
 def error404(error):
+    connection.conn.rollback()
     response.content_type = 'application/json'
     data = ret_notfound('Requested page not found',
                         data={'info': get_error_str(error)})
@@ -82,6 +87,7 @@ def error404(error):
 
 @app.error(405)
 def error405(error):
+    connection.conn.rollback()
     response.content_type = 'application/json'
     data = ret_notallowed('Method not allowed',
                           data={'info': get_error_str(error)})
@@ -89,6 +95,7 @@ def error405(error):
 
 @app.error(409)
 def error409(error):
+    connection.conn.rollback()
     response.content_type = 'application/json'
     data = ret_conflict('Conflict',
                           data={'info': get_error_str(error)})
@@ -96,6 +103,7 @@ def error409(error):
 
 @app.error(500)
 def error500(error):
+    connection.conn.rollback()
     response.content_type = 'application/json'
     data = ret_error('Unexcepted error occured',
                      data={'info': get_error_str(error)})

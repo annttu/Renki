@@ -8,23 +8,27 @@ from lib.enums import JSON_STATUS
 import routes
 import modules
 
-from lib.renki_settings import settings
-from lib.database.connection import DBConnection
+from lib.database import connection
 
 from webtest import TestApp, AppError
 import unittest
 from jsonschema import validate as jsonschema_validate
 from jsonschema.exceptions import ValidationError as JSONValidationError
 
-conn = DBConnection(settings.DB_DATABASE, settings.DB_USER,
-                    settings.DB_PASSWORD, settings.DB_SERVER,
-                    settings.DB_PORT, echo=False)
+
+# Initialize database connection
+connection.initialize_connection()
 
 def flush_tables():
-    conn.drop_tables()
-    conn.commit()
-    conn.create_tables()
-    conn.commit()
+    try:
+        connection.conn.drop_tables()
+        connection.conn.commit()
+        connection.conn.create_tables()
+        connection.conn.commit()
+    except Exception as e:
+        print(e)
+        connection.conn.rollback()
+
 
 class UserLevels:
     ADMIN = 'A'
@@ -135,9 +139,6 @@ class BaseRoutesTest(unittest.TestCase):
         self.userkey = None
         self.adminkey = None
         self.getKeys()
-
-    def tearDown(self):
-        conn.commit()
 
     def getKeys(self):
         self.getUserKey()

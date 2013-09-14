@@ -6,6 +6,8 @@ This file is part of Renki project
 
 from .tables import TABLES
 from .table import metadata
+from lib import renki_settings as settings, renki
+
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import url
@@ -14,6 +16,8 @@ from sqlalchemy.orm import sessionmaker
 
 import logging
 logger = logging.getLogger('dbconnection')
+
+conn = None
 
 class DBConnection(object):
     def __init__(self, database, username, password, host, port=5432,
@@ -74,6 +78,13 @@ class DBConnection(object):
     def commit(self):
         return self._session.commit
 
+    @property
+    def rollback(self):
+        """
+        Rollback session
+        """
+        return self._session.rollback
+
     def _create_metadata(self):
         """
         Create SQLAlchemy metadata using same metadata object as with tables.
@@ -112,6 +123,7 @@ class DBConnection(object):
         """
         self._create_session()
 
+
     def create_tables(self):
         """
         Create all tables
@@ -147,3 +159,16 @@ class DBConnection(object):
 
     def __repr__(self):
         return self.__str__()
+
+def initialize_connection():
+    """
+    Create global database connection
+    """
+    global conn
+    conn = DBConnection(settings.DB_DATABASE, settings.DB_USER,
+                        settings.DB_PASSWORD, settings.DB_SERVER,
+                        settings.DB_PORT, echo=False)
+    # Add forced commit hook
+    @renki.app.hook('after_request')
+    def force_commit():
+        conn.commit()
