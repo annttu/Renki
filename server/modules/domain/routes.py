@@ -10,7 +10,7 @@ from lib.utils import ok, error
 from lib.auth.func import authenticated
 from .domain import get_user_domains, get_domains, add_user_domain
 from lib.exceptions import AlreadyExist, DatabaseError
-from lib.validators import is_positive_int
+from lib.validators import is_positive_numeric
 import json
 import logging
 
@@ -20,7 +20,7 @@ logger = logging.getLogger('database/routes')
 @app.get('/domains/')
 @app.get('/domains')
 @authenticated(inject_user=True)
-def get_domains(user):
+def get_domains_route(user):
     """
     GET /domains
     """
@@ -30,13 +30,13 @@ def get_domains(user):
     data = dict(request.params.items())
     if data:
         if 'limit' in data:
-            if is_positive_int(data['limit']) is True:
+            if is_positive_numeric(data['limit']) is True:
                 params['limit'] = int(data['limit'])
             else:
                 try:
                     a,b = data['limit'].split(',')
-                    if is_positive_int(a) is not True \
-                       or is_positive_int(b) is not True:
+                    if is_positive_numeric(a) is not True \
+                       or is_positive_numeric(b) is not True:
                         abort(400, 'Invalid "limit" parameter')
                     else:
                         params['limit'] = int(b)
@@ -63,11 +63,9 @@ def get_domains(user):
 def domains_put_route(user):
     """
     Add domain route
-    TODO:
-    - user v.s. admin validation
     """
     modify_all = False
-    required_params = ['name', 'dns_service']
+    required_params = ['name']
     if user.has_perm('domain_modify_all'):
         required_params.append('user_id')
         modify_all = True
@@ -82,19 +80,14 @@ def domains_put_route(user):
         if value not in data:
             abort(400, '%s is mandatory value!')
     try:
-        data['dns_service'] = bool('dns_service')
-    except ValueError:
-        abort(400, 'dns_service must be boolean!')
-    try:
-        if modify_all and data['user_id']:
+        if modify_all:
             domain = add_user_domain(user_id=data['user_id'],
-                                     name=data['name'],
-                                     dns_service=data['dns_service'])
-        domain = add_user_domain(user.user_id, data['name'],
-                                 data['dns_service'])
+                                     name=data['name'])
+        else:
+            domain = add_user_domain(user.user_id, data['name'])
     except (AlreadyExist, DatabaseError) as e:
         return error(e.msg)
     except Exception as e:
-        logger.exception(e.msg)
+        logger.exception(e)
         raise
     return ok(domain.as_dict())

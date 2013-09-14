@@ -7,7 +7,7 @@ Domain logic
 
 from .database import DomainDatabase
 from lib.exceptions import AlreadyExist, Invalid
-from lib.validators import is_positive_int
+from lib.validators import is_positive_numeric
 from lib.database.filters import do_limits
 
 from sqlalchemy.orm.exc import NoResultFound
@@ -16,7 +16,7 @@ from sqlalchemy.orm.exc import NoResultFound
 def get_domains(user_id=None, limit=None, offset=None):
     query =  DomainDatabase.query()
     if user_id:
-        if is_positive_int(user_id) is not True:
+        if is_positive_numeric(user_id) is not True:
             raise Invalid('User id must be positive integer')
         query = query.filter(DomainDatabase.user_id==user_id)
     query = do_limits(query, limit, offset)
@@ -33,7 +33,7 @@ def get_user_domains(user_id, limit=None, offset=None):
     @param offset: offset in limit
     @type offset: positive integer
     """
-    if is_positive_int(user_id) is not True:
+    if is_positive_numeric(user_id) is not True:
         raise Invalid('User id must be positive integer')
     return get_domains(user_id=user_id, limit=limit, offset=offset)
 
@@ -45,13 +45,12 @@ def get_domain(name):
     except NoResultFound:
         return None
 
-def add_user_domain(userid, name, dns_service=True):
+def add_user_domain(user_id, name):
     if get_domain(name) is not None:
         raise AlreadyExist('Domain "%s" already exists' % name)
     domain = DomainDatabase()
-    domain.userid = userid
+    domain.user_id = user_id
     domain.name = name
-    domain.dns_service = dns_service
     domain.save()
     return domain
 

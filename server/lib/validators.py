@@ -56,7 +56,7 @@ def validate_boolean(value, name='Value'):
     @type name: str
     """
     if not isinstance(value, bool):
-        raise Invalid("%s must be boolean" % name)
+        raise Invalid("%s must be <bool>, not %s" % (name), type(value))
     return True
 
 def is_numeric(value):
@@ -68,11 +68,28 @@ def is_numeric(value):
     @param value: value to test
     @type value: any
     """
-    try: 
+    try:
         int(value)
     except:
         return False
     return True
+
+def validate_int(value, name="Value"):
+    """
+    Validate value is int
+    """
+    if isinstance(value, int):
+        return True
+    raise Invalid("%s must be <int>, not %s" % (name, type(value)))
+
+def validate_positive_int(value, name="Value"):
+    """
+    Validate value is positive int
+    """
+    validate_int(value, name)
+    if int(value) >= 0:
+        return True
+    raise Invalid("%s must be positive integer" % name)
 
 def is_positive_numeric(value):
     """
@@ -83,8 +100,10 @@ def is_positive_numeric(value):
     """
     try:
         value_parsed = int(value)
-        if value_parsed >= 0: return True
-        else return False
+        if value_parsed >= 0:
+            return True
+        else:
+            return False
     except:
         return False
 

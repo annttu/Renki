@@ -126,6 +126,9 @@ class DummyAuthenticationModule(AuthenticationModule):
         """
         Get user object by user_id
         """
-
+        for user in self.users:
+            if user.user_id == user_id:
+                return user
+        return None
 
 
