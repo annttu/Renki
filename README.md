@@ -1,30 +1,17 @@
-Services-library and database.sql are the body of Services - services management environment.
+Renki is core server of Renki service management system.
 
-Services have tree sections
-- Database as core of services
-- Clients like Renki and renkiadm
-- Servers like Renkisrv
+Server
+======
+Server with JSON API for clients.
 
-Getting started:
-- create database named services to postgresql
-- run sql/create_database.sh script
-- create admin user account with group admins
-- create normal user account with group users
 
-- use admin user to create first customer 
- - customer number 0 is for your company
+Client
+======
+Simple client library for Renki.
 
-- create first domain with t_customers_id 0 and t_domain_id 0
-- create user with t_domains_id = 0
+Renki is licensed under MIT-license
 
-- add some networks to t_subnets table
-- add some addresses to t_addresses table using resently created subnets
-
-- add services to t_services table (eg vhost servers)
-
-Services is licensed under MIT-license
-
-Copyright (c) 2012 Kapsi Internet-käyttäjät ry
+Copyright (c) 2012-2013 Kapsi Internet-käyttäjät ry
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
