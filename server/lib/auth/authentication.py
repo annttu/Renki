@@ -1,6 +1,7 @@
 # encoding: utf-8
 
 from lib.exceptions import AuthenticationFailed
+from hashlib import sha512
 
 
 """
@@ -26,6 +27,7 @@ class User(object):
         self.lastnames = lastname
         self.groups = groups
         self.superuser = False
+        self.password = None
 
     def get_full_name(self):
         return self.firstnames + " " + self.lastnames
@@ -37,6 +39,19 @@ class User(object):
             if group.has_permission(perm) is True:
                 return True
         return False
+    has_perm = has_permission
+
+    def check_password(self, passwd):
+        """
+        Check if password match to user password
+        """
+        return False
+
+    def set_password(self, passwd):
+        """
+        Set user password to password
+        """
+        pass
 
 class Key(object):
     def __init__(self, key, user):
@@ -52,40 +67,36 @@ class Key(object):
 class AuthenticationModule(object):
     NAME = "NotNamed"
 
-    def _find_key(self, key):
-        """
-        Find right key
-        """
-        for k in self.keys:
-            if k.key == key:
-                return k
-        return None
 
     def has_permission(self, key, perm):
         """
         Returns True if user has permission perm
         else returns False
         """
-        k = self._find_key(key)
-        if k:
-            return k.has_permission(perm)
         return False
 
     def valid_key(self, key):
         """
         Dummy key validator
         """
-        if self._find_key(key) is not None:
-            return True
         return False
 
     def get_user(self, key):
         """
-        Get user related to key
+        Get user by authentication key
         """
-        keyObject = self._find_key(key)
-        if keyObject is not None:
-            return keyObject.get_user()
+        return None
+
+    def get_by_user_id(self, user_id):
+        """
+        Get user object by user_id
+        """
+        return None
+
+    def get_by_username(self, username):
+        """
+        Get user object by username
+        """
         return None
 
     def authenticate(self, username, password):
