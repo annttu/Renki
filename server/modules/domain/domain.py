@@ -49,7 +49,7 @@ def add_user_domain(user_id, name):
     if get_domain(name) is not None:
         raise AlreadyExist('Domain "%s" already exists' % name)
     domain = DomainDatabase()
-    domain.user_id = user_id
+    domain.user_id = int(user_id)
     domain.name = name
     domain.save()
     return domain

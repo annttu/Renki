@@ -6,7 +6,7 @@ Domain objects database module
 
 from lib.database.table import RenkiUserTable, RenkiBase
 from lib.database.tables import register_table
-from lib.validators import validate_userid, validate_domain
+from lib.validators import validate_user_id, validate_domain
 from sqlalchemy import Column, String
 from sqlalchemy.orm import relationship
 
@@ -18,7 +18,7 @@ class DomainDatabase(RenkiBase, RenkiUserTable):
                             backref="domain")
 
     def validate(self):
-        validate_userid(self.userid)
+        validate_user_id(self.user_id)
         validate_domain(self.name)
 
     def save(self):

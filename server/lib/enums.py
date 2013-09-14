@@ -19,5 +19,7 @@ class JSON_STATUS:
     NOTFOUND_INFO = 'URL not found'
     NOTALLOWED = 'NOTALLOWED'
     NOTALLOWED_INFO = "Requested method not allowed"
+    CONFLICT = 'CONFLICT'
+    CONFLICT_INFO = "Request conflict with previous changes"
 
-    ALL = [OK, ERROR, SERVFAIL, NOAUTH, DENIED, NOTFOUND, NOTALLOWED]
+    ALL = [OK, ERROR, SERVFAIL, NOAUTH, DENIED, NOTFOUND, NOTALLOWED, CONFLICT]
