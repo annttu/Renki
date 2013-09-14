@@ -14,7 +14,8 @@ from sqlalchemy.orm import relationship
 class DomainDatabase(RenkiBase, RenkiUserTable):
     __tablename__ = 'domain'
     name = Column('name', String(1024), nullable=False)
-    dns_zone_id = relationship("dns_zone", uselist=False, backref="domain")
+    dns_zone_id = relationship("DNSZoneDatabase", uselist=False,
+                               backref="domain")
 
 
     def validate(self):
