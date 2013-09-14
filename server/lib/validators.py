@@ -59,28 +59,45 @@ def validate_boolean(value, name='Value'):
         raise Invalid("%s must be boolean" % name)
     return True
 
-
-def is_int(value):
+def is_numeric(value):
     """
-    test if value is integer
+    Test if value is numeric.
+
+    True-returned numerics are safe to be parsed with int(), float(), double()
 
     @param value: value to test
-    @type value: int
+    @type value: any
     """
-    try:
+    try: 
         int(value)
-    except ValueError:
+    except:
         return False
     return True
 
-
-def is_positive_int(value):
+def is_positive_numeric(value):
     """
-    Validate value is positive integer
+    Test if value is a positive numeric (zero-included)
 
     @param value: value to test
+    @type value: any
     """
-    if is_int(value) is True:
-        if int(value) >= 0:
-            return True
-    return False
+    try:
+        value_parsed = int(value)
+        if value_parsed >= 0: return True
+        else return False
+    except:
+        return False
+
+def cast_as_int(value):
+    """
+    Cast as integer (discarding any decimals)
+
+    @param value: value to cast as integer
+    @type value: any
+    @return: (True, successful-cast-result)|(False, None)
+    """
+    try:
+        casted = int(value)
+        return (True, casted)
+    except:
+        return (False, None)
