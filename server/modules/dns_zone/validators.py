@@ -1,14 +1,14 @@
 # encoding: utf-8
 
 from lib.exceptions import AlreadyExist, Invalid
-from lib.validators import is_positive_numeric, is_numeric_in_range
+from lib.validators import is_positive_numeric, is_numeric_in_range, cast_ip4addr, cast_ip6addr
 import string
 import netaddr
 
 class DNSRecordValidator(object):
     valid_characters = string.ascii_letters+'-.'+string.digits
 
-    def __init__(self, key, value, ttl, priority):
+    def __init__(self, key, value, ttl, priority=None):
         self.verify_key(key)
         self.verify_value(value)
         self.verify_ttl(ttl)
@@ -30,17 +30,14 @@ class DNSRecordValidator(object):
                 raise Invalid("Number out of required range for %s ([%i,%i])" % (self.__class__.__name__,mi,ma))
     
     def verify_priority(self, priority):
-        raise Invalid("Priority is invalid for %s" % self.__class__.__name__)
+        if priority is not None:
+            raise Invalid("Priority is invalid for %s" % self.__class__.__name__)
 
 class DNSNamedRecordValidator(DNSRecordValidator):
     def verify_value(self, value):
         if all(c in DNSRecordValidator.valid_characters for c in value):
-            is_ip = None
-            try:
-                netaddr.IPAddress(value)
-                is_ip = True
-            except:
-                is_ip = False
+            is_ip, addr = cast_ip4addr(value)
+            if not is_ip: is_ip, addr = cast_ip6addr(value)
 
             if is_ip: raise Invalid("Cannot have IP address in value of %s" % self.__class__.__name__)
         else:
@@ -62,14 +59,14 @@ class DNSPriorizedNamedRecordValidator(DNSNamedRecordValidator):
 
 class DNSARecordValidator(DNSRecordValidator):
     def verify_value(self, value):
-        ip = netaddr.IPAddress(value)
-        if ip.version != 4:
+        res, ip = cast_ip4addr(value)
+        if not res or ip.version != 4:
             raise Invalid("Invalid IPv4 Address for %s" % self.__class__.__name__)
 
 class DNSAAAARecordValidator(DNSRecordValidator):
     def verify_value(self, value):
-        ip = netaddr.IPAddress(value)
-        if ip.version != 6:
+        res, ip = cast_ip6addr(value)
+        if not res or ip.version != 6:
             raise Invalid("Invalid IPv6 Address for %s" % self.__class__.__name__)
 
 

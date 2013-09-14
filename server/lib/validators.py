@@ -1,7 +1,7 @@
 # encoding: utf-8
 
 from .exceptions import Invalid
-
+import netaddr
 
 def validate_domain(domain, name='Value'):
     """
@@ -162,3 +162,23 @@ def is_numeric_in_range(value, min, max):
             return False
     except:
         return False
+
+def cast_ip4addr(ipaddr_str):
+    if ipaddr_str.count('.') == 3:
+        try:
+            ip = netaddr.IPAddress(ipaddr_str)
+            return (True, ip)
+        except:
+            return (False, None)
+    else:
+        return (False, None)
+
+def cast_ip6addr(ipaddr_str):
+    if ipaddr_str.count(':') >= 2:
+        try:
+            ip = netaddr.IPAddress(ipaddr_str)
+            return (True, ip)
+        except:
+            return (False, None)
+    else:
+        return (False, None)
