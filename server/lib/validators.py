@@ -3,14 +3,14 @@
 from .exceptions import Invalid
 
 
-def validate_domain(domain):
+def validate_domain(domain, name='Value'):
     """
     Validate domain
 
     @param domain: Domain name
     @type domain: str
     """
-    if not domain:
+    if domain is None:
         raise Invalid("Domain cannot be None")
     if not isinstance(domain, str):
         raise Invalid("Domain name must be string")
@@ -22,12 +22,16 @@ def validate_domain(domain):
         raise Invalid("Domain cannot begin with dot")
     elif domain.endswith('.') and '.' not in domain[:-1]:
         raise Invalid("Domain must have at least one dot in middle")
-    return True
+    try:
+        return domain.encode("idna").decode("utf-8")
+    except:
+        raise Invalid("Domain contains invalid characters")
 
 
-def validate_userid(mid):
+
+def validate_user_id(mid):
     """
-    Validate userid
+    Validate user_id
 
     @param userid: User id
     @type userid: int
@@ -36,7 +40,7 @@ def validate_userid(mid):
         raise Invalid("Member id is always integer")
     if mid < 0:
         raise Invalid("Member id is always positive integer")
-    return True
+    return int(mid)
 
 
 def is_boolean(value):
@@ -55,9 +59,14 @@ def validate_boolean(value, name='Value'):
     @param name: Value name
     @type name: str
     """
-    if not isinstance(value, bool):
-        raise Invalid("%s must be <bool>, not %s" % (name), type(value))
-    return True
+    if isinstance(value, bool):
+        return value
+    elif isinstance(value, str):
+        if value.lower == 'true':
+            return True
+        elif value.lower ==  'false':
+            return False
+    raise Invalid("%s must be <bool>, not %s" % (name), type(value))
 
 def is_numeric(value):
     """
@@ -79,7 +88,7 @@ def validate_int(value, name="Value"):
     Validate value is int
     """
     if isinstance(value, int):
-        return True
+        return int(value)
     raise Invalid("%s must be <int>, not %s" % (name, type(value)))
 
 def validate_positive_int(value, name="Value"):
@@ -88,7 +97,7 @@ def validate_positive_int(value, name="Value"):
     """
     validate_int(value, name)
     if int(value) >= 0:
-        return True
+        return int(value)
     raise Invalid("%s must be positive integer" % name)
 
 def is_positive_numeric(value):
@@ -106,6 +115,18 @@ def is_positive_numeric(value):
             return False
     except:
         return False
+
+def validate_string(value, name="Value"):
+    """
+    Test if value is string.
+
+    @param value: value to test
+    @type value: any
+    """
+    if isinstance(value, str):
+        return value
+    raise Invalid("%s must be string, not %s" % (name, type(value)))
+
 
 def cast_as_int(value):
     """

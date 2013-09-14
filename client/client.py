@@ -2,7 +2,7 @@
 
 from .exceptions import NotAuthorized, NotFound, NotAuthenticated, \
     InvalidResponse, RenkiException, ServerError, AuthenticationFailed, \
-    HTTPException
+    HTTPException, InvalidRequest, MethodNotAllowed, Conflict
 import requests
 
 
@@ -69,19 +69,27 @@ class RenkiClient(object):
             error = _json['error']
         except KeyError:
             raise InvalidResponse("Got invalid response from server")
-
+        info = None
+        try:
+            info = _json['info']
+        except KeyError:
+            pass
         if code == 400 or status == 'ERROR':
-            raise RenkiException(error)
+            raise InvalidRequest(error, info=info)
         elif code == 401 or status == 'NOAUTH':
-            raise NotAuthenticated(error)
+            raise NotAuthenticated(error, info=info)
         elif code == 403 or status == 'DENIED':
-            raise NotAuthorized(error)
+            raise NotAuthorized(error, info=info)
         elif code == 404 or status == 'NOTFOUND':
-            raise NotFound(error)
+            raise NotFound(error, info=info)
+        elif code == 405 or status == 'NOTALLOWD':
+            raise MethodNotAllowed(error, info=info)
+        elif code == 409 or status == 'CONFLICT':
+            raise Conflict(error, info=info)
         elif code == 500 or status == 'SERVFAIL':
-            raise ServerError(error)
+            raise ServerError(error, info=info)
         else:
-            raise RenkiException(error)
+            raise RenkiException(error, info=info)
 
     def _abs_url(self, path):
         """
