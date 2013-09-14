@@ -3,6 +3,10 @@
 
 import unittest
 
+import routes
+import modules
+
+
 # Testing modules to run
 tests = ['test_generic', 'test_domain_routes']
 

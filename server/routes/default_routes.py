@@ -5,7 +5,7 @@ from bottle import response, abort
 from lib.renki import app, __version__ as version
 from lib.utils import ok as ret_ok, error as ret_error, noauth as ret_noauth, \
     notfound as ret_notfound, notallowed as ret_notallowed, \
-    denied as ret_denied
+    denied as ret_denied, conflict as ret_conflict
 import json
 
 
@@ -90,7 +90,7 @@ def error405(error):
 @app.error(409)
 def error409(error):
     response.content_type = 'application/json'
-    data = ret_notallowed('Conflict',
+    data = ret_conflict('Conflict',
                           data={'info': get_error_str(error)})
     return json.dumps(data)
 

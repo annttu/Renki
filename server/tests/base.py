@@ -6,12 +6,25 @@ from lib import renki, utils
 from lib.enums import JSON_STATUS
 # Register routes
 import routes
+import modules
+
+from lib.renki_settings import settings
+from lib.database.connection import DBConnection
 
 from webtest import TestApp, AppError
 import unittest
 from jsonschema import validate as jsonschema_validate
 from jsonschema.exceptions import ValidationError as JSONValidationError
 
+conn = DBConnection(settings.DB_DATABASE, settings.DB_USER,
+                    settings.DB_PASSWORD, settings.DB_SERVER,
+                    settings.DB_PORT, echo=False)
+
+def flush_tables():
+    conn.drop_tables()
+    conn.commit()
+    conn.create_tables()
+    conn.commit()
 
 class UserLevels:
     ADMIN = 'A'
@@ -67,6 +80,7 @@ class BaseRoutesTest(unittest.TestCase):
     LOGIN_REQUIRED = True
     ADMIN_REQUIRED = False
     IGNORE_TEST = False
+    IGNORE_DATABASE_FLUSH = False
 
     ROUTINE = None
     POST_ARGS = {}
@@ -114,12 +128,16 @@ class BaseRoutesTest(unittest.TestCase):
             cls.IGNORE_TEST = True
 
     def setUp(self):
-
         renki.app.catchall = False
         self.app = TestApp(renki.app)
+        if not self.IGNORE_DATABASE_FLUSH:
+            flush_tables()
         self.userkey = None
         self.adminkey = None
         self.getKeys()
+
+    def tearDown(self):
+        conn.commit()
 
     def getKeys(self):
         self.getUserKey()
