@@ -15,8 +15,8 @@ class DNSRecordValidator(object):
         self.verify_priority(priority)
     
     def verify_key(self, key):
-        if not all(c in DNSRecordValidator.valid_characters for c in key):
-            raise Invalid("Invalid characters in key of %s" % self.__class__.__name__)
+        if not all(c in DNSRecordValidator.valid_characters for c in key) or len(key.strip()) == 0:
+            raise Invalid("Invalid characters in key or zero-length of %s" % self.__class__.__name__)
     
     def verify_value(self, value):
         raise Invalid("Value check not implemented for %s" % self.__class__.__name__)
@@ -35,7 +35,9 @@ class DNSRecordValidator(object):
 
 class DNSNamedRecordValidator(DNSRecordValidator):
     def verify_value(self, value):
-        if all(c in DNSRecordValidator.valid_characters for c in value):
+        if len(value.strip()) == 0:
+            raise Invalid("Cannot accept zero-length value")
+        elif all(c in DNSRecordValidator.valid_characters for c in value):
             is_ip, addr = cast_ip4addr(value)
             if not is_ip: is_ip, addr = cast_ip6addr(value)
 
