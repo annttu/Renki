@@ -28,6 +28,8 @@ class DNSZoneDatabase(RenkiBase, RenkiTable):
 
 class DNSEntryDatabase(RenkiBase, RenkiTable):
     __tablename__ = 'dns_record'
+    all_record_types = ['A','AAAA','CNAME','NS','TXT','SRV','MX']
+
     dns_zone    = Column('dns_zone_id', Integer,    ForeignKey('dns_zone.id'))
 
     key         = Column('key',         String,     nullable=False)
@@ -37,6 +39,8 @@ class DNSEntryDatabase(RenkiBase, RenkiTable):
     priority    = Column('priority',    Integer,    nullable=True,  default=None)
 
     def validate(self):
+        if self.record_type in DNSEntryDatabase.all_record_types:
+            pass
 
 
 # Register tables
