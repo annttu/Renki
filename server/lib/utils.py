@@ -104,6 +104,22 @@ def denied(error="Permission denied", data={}):
     return data
 
 
+def conflict(error="Conflict", data={}):
+    """
+    Creates uniform return values when requested method is not allowed
+
+    @param error: Error message
+    @type error: string
+    @param data: Other data
+    @type data: dict
+    """
+    if not data:
+        data = {}
+    data['status'] = JSON_STATUS.CONFLICT
+    data['error'] = error
+    return data
+
+
 def generate_key(size=30):
     """
     Generate random key

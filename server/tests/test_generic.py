@@ -10,6 +10,7 @@ class TestIndexRoute(BaseRoutesTest):
     Test / route
     """
     LOGIN_REQUIRED = False
+    IGNORE_DATABASE_FLUSH = True
     ROUTINE = '/'
     DEFAULT_RETVAL = APIResponses.OK
     POST_RETVAL = APIResponses.NOTALLOWED
@@ -23,6 +24,7 @@ class TestVersionRoute(BaseRoutesTest):
     Test /versin route
     """
     LOGIN_REQUIRED = False
+    IGNORE_DATABASE_FLUSH = True
     ROUTINE = '/version'
     DEFAULT_RETVAL = APIResponses.OK
     POST_RETVAL = APIResponses.NOTALLOWED
@@ -44,6 +46,7 @@ class TestErrorRoute(BaseRoutesTest):
     Test /error route
     """
     LOGIN_REQUIRED = False
+    IGNORE_DATABASE_FLUSH = True
     ROUTINE = '/error'
     DEFAULT_RETVAL = APIResponses.ERROR
     POST_RETVAL = APIResponses.ERROR

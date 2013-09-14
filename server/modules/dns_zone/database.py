@@ -18,20 +18,20 @@ class DNSZoneDatabase(RenkiBase, RenkiTable):
     retry       = Column('retry',       Integer,    nullable=False)
     expire      = Column('expire',      Integer,    nullable=False)
     ttl         = Column('ttl',         Integer,    nullable=False)
-    
+
     # EMail address field
     rname       = Column('rname',       String,     nullable=False)
 
     # This is default TTL for records
     record_ttl  = Column('record_ttl',  Integer,    nullable=False)
-    
+
     records     = relationship('DNSEntryDatabase', uselist=True, backref='dns_zone')
 
 class DNSEntryDatabase(RenkiBase, RenkiTable):
     __tablename__ = 'dns_record'
     all_record_types = ['A','AAAA','CNAME','NS','TXT','SRV','MX']
 
-    dns_zone    = Column('dns_zone_id', Integer,    ForeignKey('dns_zone.id'))
+    dns_zone_id = Column('dns_zone_id', Integer,    ForeignKey('dns_zone.id'))
 
     key         = Column('key',         String,     nullable=False)
     record_type = Column('record_type', String,     nullable=False)

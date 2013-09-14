@@ -8,9 +8,10 @@ from lib import utils
 
 class TestDomainGetRoute(BaseRoutesTest):
     """
-    Test GET,POST /domains/ route
+    Test GET /domains/ route
     """
     ROUTINE = '/domains/'
+    IGNORE_DATABASE_FLUSH = True
     DEFAULT_RETVAL = APIResponses.NOAUTH
     LOGIN_REQUIRED = True
     ADMIN_REQUIRED = False
@@ -51,7 +52,7 @@ class TestDomainPutRoute(BaseRoutesTest):
     ANONYMOUS_DEFAULT = APIResponses.NOAUTH
     ANONYMOUS_PUT = APIResponses.NOAUTH
 
-    PUT_ARGS = {'name': 'example.com', 'member': 0, 'dns_services': True}
+    PUT_ARGS = {'name': 'example.com', 'user_id': 2}
 
 if __name__ == '__main__':
     unittest.main()

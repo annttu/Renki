@@ -28,7 +28,7 @@ def validate_domain(domain, name='Value'):
         raise Invalid("Domain contains invalid characters")
 
 
-def validate_user_id(mid):
+def validate_user_id(mid, name="user_id"):
     """
     Validate user_id
 
