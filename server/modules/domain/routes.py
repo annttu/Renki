@@ -9,8 +9,11 @@ from lib.renki import app
 from lib.utils import ok, error
 from lib.auth.func import authenticated
 from .domain import get_user_domains, get_domains, add_user_domain
-from lib.exceptions import AlreadyExist, DatabaseError
-from lib.validators import is_positive_numeric
+from lib.exceptions import AlreadyExist, DatabaseError, RenkiHTTPError
+from lib.validators import is_positive_numeric, validate_user_id, \
+                           validate_domain
+from lib import input_field
+
 import json
 import logging
 
@@ -65,23 +68,15 @@ def domains_put_route(user):
     Add domain route
     """
     modify_all = False
-    required_params = ['name']
+    fields = [input_field.InputField(key='name', validator=validate_domain)]
     if user.has_perm('domain_modify_all'):
-        required_params.append('user_id')
+        fields.append(input_field.InputField(key='user_id',
+                                             validator=validate_user_id))
         modify_all = True
     data = request.json
     if not data:
         data = dict(request.params.items())
-    if 'key' in data:
-        del data['key']
-    if not data:
-        abort(400, 'Domain object is mandatory!')
-    for value in required_params:
-        if value not in data:
-            abort(400, '%s is mandatory value!')
-    for value in data:
-        if value not in required_params:
-            abort(400, "%s is unknown value!" % value)
+    data = input_field.verify_input(data, fields=fields)
     try:
         if modify_all:
             domain = add_user_domain(user_id=data['user_id'],
@@ -89,7 +84,9 @@ def domains_put_route(user):
         else:
             domain = add_user_domain(user.user_id, data['name'])
     except (AlreadyExist, DatabaseError) as e:
-        return error(e.msg)
+        return error(str(e))
+    except RenkiHTTPError:
+        raise
     except Exception as e:
         logger.exception(e)
         raise
