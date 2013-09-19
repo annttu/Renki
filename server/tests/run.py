@@ -5,7 +5,7 @@ import unittest
 
 
 # Testing modules to run
-tests = ['test_generic', 'test_domain_routes']
+tests = ['test_generic']
 
 
 def is_wanted_test(name, class_):

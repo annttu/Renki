@@ -2,7 +2,7 @@
 # encoding: utf-8
 
 import unittest
-from tests.base import BaseRoutesTest, APIResponses
+from lib.test_base import BaseRoutesTest, APIResponses
 
 
 class TestIndexRoute(BaseRoutesTest):

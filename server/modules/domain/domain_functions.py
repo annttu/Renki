@@ -1,11 +1,13 @@
 # encoding: utf-8
+# encoding: utf-8
 
 """
 Domain logic
 """
 
 
-from .database import DomainDatabase
+from .domain_database import DomainDatabase
+
 from lib.exceptions import AlreadyExist, Invalid
 from lib.validators import is_positive_numeric
 from lib.database.filters import do_limits

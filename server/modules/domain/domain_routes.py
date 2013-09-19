@@ -8,10 +8,10 @@ from bottle import response, request, abort
 from lib.renki import app
 from lib.utils import ok, error
 from lib.auth.func import authenticated
-from .domain import get_user_domains, get_domains, add_user_domain
+from .domain_functions import get_user_domains, get_domains, add_user_domain
 from lib.exceptions import AlreadyExist, DatabaseError, RenkiHTTPError
 from lib.validators import is_positive_numeric, validate_user_id, \
-                           validate_domain
+                           validate_domain, is_numeric
 from lib import input_field
 
 import json
@@ -68,18 +68,20 @@ def domains_put_route(user):
     Add domain route
     """
     modify_all = False
+    data = request.json
+    if not data:
+        data = dict(request.params.items())
     fields = [input_field.InputField(key='name', validator=validate_domain)]
     if user.has_perm('domain_modify_all'):
         fields.append(input_field.InputField(key='user_id',
                                              validator=validate_user_id))
         modify_all = True
-    data = request.json
-    if not data:
-        data = dict(request.params.items())
+        if 'user_id' in data and is_numeric(data['user_id']):
+            data['user_id'] = int(data['user_id'] )
     data = input_field.verify_input(data, fields=fields)
     try:
         if modify_all:
-            domain = add_user_domain(user_id=data['user_id'],
+            domain = add_user_domain(user_id=int(data['user_id']),
                                      name=data['name'])
         else:
             domain = add_user_domain(user.user_id, data['name'])

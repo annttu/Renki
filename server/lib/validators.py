@@ -36,9 +36,9 @@ def validate_user_id(mid, name="user_id"):
     @type userid: int
     """
     if not isinstance(mid, int):
-        raise Invalid("Member id is always integer")
+        raise Invalid("User id is always integer")
     if mid < 0:
-        raise Invalid("Member id is always positive integer")
+        raise Invalid("User id is always positive integer")
     return int(mid)
 
 

@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
+"""
+Base utils for testing
+
+Located here to help importing :)
+"""
 
 from lib import renki, utils
 from lib.enums import JSON_STATUS
@@ -45,6 +50,7 @@ class APIResponses:
     DENIED = 4
     DEFAULT = 5
     NOTALLOWED = 6
+    CONFLICT = 7
 
 
 def validate_value(value, validator):
@@ -58,28 +64,211 @@ def validate_value(value, validator):
 def module_name():
     return __file__.split('/')[-1]
 
-# REQUEST vars
+
+class TestingBase(unittest.TestCase):
+
+    FLUSH_TABLES = True
+
+    @classmethod
+    def setUpClass(cls):
+        renki.app.catchall = False
+
+    def setUp(self):
+        if self.FLUSH_TABLES:
+            flush_tables()
+        self.app = TestApp(renki.app)
+        self.userkey = None
+        self.adminkey = None
+        self.getKeys()
+
+    def getKeys(self):
+        self.getUserKey()
+        self.getAdminKey()
+
+    def getUserKey(self):
+        r = self.post('/login', {'username': 'test', 'password': 'test'})
+        if 'key' in r.json:
+            self.userkey = r.json['key']
+
+    def getAdminKey(self):
+        r = self.post('/login', {'username': 'admin', 'password': 'admin'})
+        if 'key' in r.json:
+            self.adminkey = r.json['key']
+
+    def _getKey(self, params={}, level=UserLevels.ANONYMOUS):
+        """
+        Add or remove key from params according to level
+        @returns: modifed params dictionary (Copied)
+        """
+        # This prevents key from leaking to method_ARGS
+        params = params.copy()
+        if level == UserLevels.USER:
+            params['key'] = self.userkey
+        elif level == UserLevels.ADMIN:
+            params['key'] = self.adminkey
+        elif 'key' in params:
+            del params['key']
+        return params
+
+    def _get_error(self, item):
+        error = None
+        try:
+            if 'error' in item.json:
+                error = item.json['error']
+        except (AttributeError, KeyError):
+            pass
+        return error
+
+    def get(self, url, params={}, level=UserLevels.ANONYMOUS):
+        params = self._getKey(params=params, level=level)
+        return self.app.get(url, params=params, status="*")
+
+    def post(self, url, data={}, level=UserLevels.ANONYMOUS):
+        data = self._getKey(params=data, level=level)
+        return self.app.post_json(url, data, status="*")
+
+    def put(self, url, data={}, level=UserLevels.ANONYMOUS):
+        data = self._getKey(params=data, level=level)
+        return self.app.put_json(url, data, status="*")
+
+    def delete(self, url, params={}, level=UserLevels.ANONYMOUS):
+        params = self._getKey(params=params, level=level)
+        return self.app.delete(url, params=params, status="*")
+
+    def assertValidJSON(self, item, schema=None):
+        self.assertTrue(item.content_type == 'application/json',
+                        "Content type not JSON")
+        self.assertTrue('status' in item.json, 'status is mandatory argument')
+        if schema:
+            try:
+                jsonschema_validate(item.json, schema=schema)
+            except JSONValidationError:
+                raise AssertionError("Response json is not valid")
+
+    def assertStatus(self, item, status=JSON_STATUS.OK):
+        self.assertEqual(item.json['status'], status,
+                         "Invalid status code %s, excepted %s, error: %s" % (
+                                    item.json['status'], status,
+                                    self._get_error(item)))
+
+    def assertJSONContains(self, item, key):
+        self.assertTrue(key in item.json,
+                        '%s not found from JSON' % key)
+
+    def assertJSONValue(self, item, key, value):
+        self.assertJSONContains(item, key)
+        self.assertTrue(item.json[key] == value,
+                        "Value of key %s is invalid" % key)
+
+    def assertJSONValueType(self, item, key, type):
+        self.assertJSONContains(item, key)
+        self.assertTrue(isinstance(item.json[key], type),
+                        "Value of key %s have invalid type" % key)
+
+    def assertHTTPStatus(self, item, code, msg=None):
+        if not msg:
+            msg = "Status code is not %s, %s" % (code, self._get_error(item))
+        self.assertEqual(item.status_int, code, msg)
+
+    def assertContent(self, item, content):
+        for k, v in content.items():
+            self.assertTrue(k in item.json, "Key %s not in response" % k)
+            if isinstance(v, type(lambda x: x)):
+                # v is validator
+                self.assertTrue(v(item.json[k]))
+            else:
+                self.assertEquals(item.json[k], v, "Invalid value for key %s"
+                                  % k)
+
+    def assertOK(self, item):
+        self.assertHTTPStatus(item, 200)
+        self.assertStatus(item, JSON_STATUS.OK)
+
+    def assertERROR(self, item):
+        self.assertStatus(item, JSON_STATUS.ERROR)
+        self.assertHTTPStatus(item, 400)
+        self.assertContent(item, {'error': lambda x: bool(x)})
+
+    def assertNOTALLOWED(self, item):
+        self.assertHTTPStatus(item, 405)
+        self.assertStatus(item, JSON_STATUS.NOTALLOWED)
+        self.assertContent(item, {'error': lambda x: bool(x)})
+
+    def assertDENIED(self, item):
+        self.assertStatus(item, JSON_STATUS.DENIED)
+        self.assertHTTPStatus(item, 401)
+        self.assertContent(item, {'error': lambda x: bool(x)})
+
+    def assertCONFLICT(self, item):
+        self.assertStatus(item, JSON_STATUS.DENIED)
+        self.assertHTTPStatus(item, 409)
+        self.assertContent(item, {'error': lambda x: bool(x)})
+
+    def assertAuthFailed(self, item):
+        self.assertHTTPStatus(item, 401,
+                         "Authentication error not given")
+        self.assertStatus(item, JSON_STATUS.NOAUTH)
+
+    def assertAuthSuccess(self, item):
+        self.assertHTTPStatus(item, 200)
+        self.assertStatus(item, JSON_STATUS.OK)
 
 
-class Required:
-    def __init__(self, key, value=None):
-        self.key = key
-        self.value = value
+class SimpleRouteTest(TestingBase):
+
+    def do_test(self, route, method, args, user, response, status):
+        """
+        @param route: Route to test e.g. /domain/
+        @type routine: string
+        @param method: test method
+        @type method: ['GET','POST','DELETE','PUT']
+        @param args: query params
+        @type args: dict
+        @param user: user type
+        @type user: UserLevels enum
+        @param response: response schema
+        @type response: dict
+        @param status: Response status
+        @type status: APIResponses enum
+        """
+        if user not in UserLevels.ALL:
+            raise AssertionError('Invalid user level %s' % user)
+        if method == 'DELETE':
+            item = self.delete(route, params=args,
+                               level=user)
+        elif method == 'POST':
+            item = self.post(route, data=args,
+                             level=user)
+        elif method == 'PUT':
+            item = self.put(route, data=args,
+                            level=user)
+        elif method == 'GET':
+            item = self.get(route, params=args,
+                            level=user)
+        else:
+            raise AssertionError("Invalid method %s" % method)
+        if status == APIResponses.ERROR:
+            self.assertERROR(item)
+        elif status == APIResponses.DENIED:
+            self.assertDENIED(item)
+        elif status == APIResponses.OK:
+            self.assertOK(item)
+            if response:
+                self.assertValidJSON(item, schema=response)
+        elif status == APIResponses.NOTALLOWED:
+            self.assertNOTALLOWED(item)
+        elif status == APIResponses.NOAUTH:
+            self.assertAuthFailed(item)
+        elif status == APIResponses.CONFLICT:
+            self.assertCONFLICT(item)
+        else:
+            raise AssertionError('Invalid excepted value %s' % status)
 
 
-class Optional:
-    def __init__(self, key, value=None):
-        self.key = key
-        self.value = value
-
-
-class Invalid:
-    def __init__(self, key, value=None):
-        self.key = key
-        self.value = value
-
-
-class BaseRoutesTest(unittest.TestCase):
+class BaseRoutesTest(TestingBase):
+    """
+    Test route functionality
+    """
 
     LOGIN_REQUIRED = True
     ADMIN_REQUIRED = False
@@ -140,122 +329,6 @@ class BaseRoutesTest(unittest.TestCase):
         self.adminkey = None
         self.getKeys()
 
-    def getKeys(self):
-        self.getUserKey()
-        self.getAdminKey()
-
-    def getUserKey(self):
-        r = self.post('/login', {'username': 'test', 'password': 'test'})
-        if 'key' in r.json:
-            self.userkey = r.json['key']
-
-    def getAdminKey(self):
-        r = self.post('/login', {'username': 'admin', 'password': 'admin'})
-        if 'key' in r.json:
-            self.adminkey = r.json['key']
-
-    def _getKey(self, params={}, level=UserLevels.ANONYMOUS):
-        """
-        Add or remove key from params according to level
-        @returns: modifed params dictionary (Copied)
-        """
-        # This prevents key from leaking to method_ARGS
-        params = params.copy()
-        if level == UserLevels.USER:
-            params['key'] = self.userkey
-        elif level == UserLevels.ADMIN:
-            params['key'] = self.adminkey
-        elif 'key' in params:
-            del params['key']
-        return params
-
-    def get(self, url, params={}, level=UserLevels.ANONYMOUS):
-        params = self._getKey(params=params, level=level)
-        return self.app.get(url, params=params, status="*")
-
-    def post(self, url, data={}, level=UserLevels.ANONYMOUS):
-        data = self._getKey(params=data, level=level)
-        return self.app.post_json(url, data, status="*")
-
-    def put(self, url, data={}, level=UserLevels.ANONYMOUS):
-        data = self._getKey(params=data, level=level)
-        return self.app.put_json(url, data, status="*")
-
-    def delete(self, url, params={}, level=UserLevels.ANONYMOUS):
-        params = self._getKey(params=params, level=level)
-        return self.app.delete(url, params=params, status="*")
-
-    def assertValidJSON(self, item, schema=None):
-        self.assertTrue(item.content_type == 'application/json',
-                        "Content type not JSON")
-        self.assertTrue('status' in item.json, 'status is mandatory argument')
-        if schema:
-            try:
-                jsonschema_validate(item.json, schema=schema)
-            except JSONValidationError:
-                raise AssertionError("Response json is not valid")
-
-    def assertStatus(self, item, status=JSON_STATUS.OK):
-        self.assertEqual(item.json['status'], status,
-                         "Invalid status code %s, excepted %s" % (
-                                    item.json['status'], status))
-
-    def assertJSONContains(self, item, key):
-        self.assertTrue(key in item.json,
-                        '%s not found from JSON' % key)
-
-    def assertJSONValue(self, item, key, value):
-        self.assertJSONContains(item, key)
-        self.assertTrue(item.json[key] == value,
-                        "Value of key %s is invalid" % key)
-
-    def assertJSONValueType(self, item, key, type):
-        self.assertJSONContains(item, key)
-        self.assertTrue(isinstance(item.json[key], type),
-                        "Value of key %s have invalid type" % key)
-
-    def assertHTTPStatus(self, item, code, msg=None):
-        if not msg:
-            msg = "Status code is not %s" % code
-        self.assertEqual(item.status_int, code, msg)
-
-    def assertContent(self, item, content):
-        for k, v in content.items():
-            self.assertTrue(k in item.json, "Key %s not in response" % k)
-            if isinstance(v, type(lambda x: x)):
-                # v is validator
-                self.assertTrue(v(item.json[k]))
-            else:
-                self.assertEquals(item.json[k], v, "Invalid value for key %s"
-                                  % k)
-
-    def assertOK(self, item):
-        self.assertHTTPStatus(item, 200)
-        self.assertStatus(item, JSON_STATUS.OK)
-
-    def assertERROR(self, item):
-        self.assertStatus(item, JSON_STATUS.ERROR)
-        self.assertHTTPStatus(item, 400)
-        self.assertContent(item, {'error': lambda x: bool(x)})
-
-    def assertNOTALLOWED(self, item):
-        self.assertHTTPStatus(item, 405)
-        self.assertStatus(item, JSON_STATUS.NOTALLOWED)
-        self.assertContent(item, {'error': lambda x: bool(x)})
-
-    def assertDENIED(self, item):
-        self.assertStatus(item, JSON_STATUS.DENIED)
-        self.assertHTTPStatus(item, 401)
-        self.assertContent(item, {'error': lambda x: bool(x)})
-
-    def assertAuthFailed(self, item):
-        self.assertHTTPStatus(item, 401,
-                         "Authentication error not given")
-        self.assertStatus(item, JSON_STATUS.NOAUTH)
-
-    def assertAuthSuccess(self, item):
-        self.assertHTTPStatus(item, 200)
-        self.assertStatus(item, JSON_STATUS.OK)
 
     def test_keys(self):
         """
