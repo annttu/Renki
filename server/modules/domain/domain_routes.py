@@ -71,17 +71,14 @@ def domains_put_route(user):
     data = request.json
     if not data:
         data = dict(request.params.items())
-    fields = [input_field.InputField(key='name', validator=validate_domain)]
+    fields = [input_field.DomainField(key='name')]
     if user.has_perm('domain_modify_all'):
-        fields.append(input_field.InputField(key='user_id',
-                                             validator=validate_user_id))
+        fields.append(input_field.UserIdField(key='user_id'))
         modify_all = True
-        if 'user_id' in data and is_numeric(data['user_id']):
-            data['user_id'] = int(data['user_id'] )
     data = input_field.verify_input(data, fields=fields)
     try:
         if modify_all:
-            domain = add_user_domain(user_id=int(data['user_id']),
+            domain = add_user_domain(user_id=data['user_id'],
                                      name=data['name'])
         else:
             domain = add_user_domain(user.user_id, data['name'])

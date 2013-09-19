@@ -3,43 +3,43 @@
 from .exceptions import Invalid
 import netaddr
 
-def validate_domain(domain, name='Value'):
+def validate_domain(value, name="Value"):
     """
-    Validate domain
+    Validate domain `value`
 
     @param domain: Domain name
     @type domain: str
     """
-    if domain is None:
+    if value is None:
         raise Invalid("Domain cannot be None")
-    if not isinstance(domain, str):
-        raise Invalid("Domain name must be string")
-    elif len(domain) < 3:
+    if not isinstance(value, str):
+        raise Invalid("Domain name must be string, not %s" % type(value))
+    elif len(value) < 3:
         raise Invalid("Domain must be at least 3 characters long")
-    elif '.' not in domain:
+    elif '.' not in value:
         raise Invalid("Domain must have at least one dot")
-    elif domain.startswith('.'):
+    elif value.startswith('.'):
         raise Invalid("Domain cannot begin with dot")
-    elif domain.endswith('.') and '.' not in domain[:-1]:
+    elif value.endswith('.') and '.' not in value[:-1]:
         raise Invalid("Domain must have at least one dot in middle")
     try:
-        return domain.encode("idna").decode("utf-8")
+        return value.encode("idna").decode("utf-8")
     except:
         raise Invalid("Domain contains invalid characters")
 
 
-def validate_user_id(mid, name="user_id"):
+def validate_user_id(value, name="user_id"):
     """
     Validate user_id
 
     @param userid: User id
     @type userid: int
     """
-    if not isinstance(mid, int):
+    if not isinstance(value, int):
         raise Invalid("User id is always integer")
-    if mid < 0:
+    if value < 0:
         raise Invalid("User id is always positive integer")
-    return int(mid)
+    return value
 
 
 def is_boolean(value):
