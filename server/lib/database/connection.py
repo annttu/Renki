@@ -13,6 +13,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import url
 from sqlalchemy.schema import MetaData
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import func
 
 import logging
 logger = logging.getLogger('dbconnection')
@@ -123,7 +124,6 @@ class DBConnection(object):
         """
         self._create_session()
 
-
     def create_tables(self):
         """
         Create all tables
@@ -171,4 +171,12 @@ def initialize_connection():
     # Add forced commit hook
     @renki.app.hook('after_request')
     def force_commit():
-        conn.commit()
+        try:
+            xid = conn._session.query(func.txid_current()).first()
+            logger.info("Transaction id: %s" % xid)
+            logger.debug("Commit")
+            conn.commit()
+        except Exception as e:
+            logger.error(e)
+            logger.debug("Rollback")
+            conn.rollback()

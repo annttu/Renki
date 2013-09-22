@@ -3,16 +3,17 @@
 from lib.exceptions import Invalid, DoesNotExist, DatabaseError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.schema import MetaData
-from sqlalchemy import Column, Integer
+from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.exc import SQLAlchemyError
+from datetime import datetime
 
 import logging
 logger = logging.getLogger('modules.repository')
 
 
 class RenkiTable(object):
-    id = Column(Integer(), primary_key=True, nullable=False)
+    id = Column("id", Integer, primary_key=True, nullable=False)
     _conn = None
 
     @classmethod
@@ -52,6 +53,7 @@ class RenkiTable(object):
         """
         Delete this object from database
         """
+        self._conn.delete(self)
         return True
 
     def save(self):
@@ -60,6 +62,7 @@ class RenkiTable(object):
         new one.
         """
         self.validate()
+        self._conn.add(self)
         return True
 
     def as_dict(self):
@@ -68,12 +71,28 @@ class RenkiTable(object):
         """
         ret = {}
         for i in self.__table__.columns.keys():
-            ret[i] = getattr(self, i)
+            if i in ['timestamp']:
+                ret[i] = str(getattr(self, i))
+            elif i not in ['deleted']:
+                ret[i] = getattr(self, i)
         return ret
 
-# RenkiUserTable contains userid
 
-class RenkiUserTable(RenkiTable):
+class RenkiDataTable(RenkiTable):
+    # Every data table have comment, deleted and timestamp columns
+    comment = Column("comment", String, nullable=False, default='')
+    deleted = Column("deleted", Integer, nullable=True, default=None)
+    timestamp =   Column("timestamp", DateTime, nullable=False,
+                         default=datetime.now)
+
+
+class RenkiUserDataTable(RenkiDataTable):
+    # Every user data table contains waiting column
+    waiting = Column("waiting", Boolean, nullable=False, default=False)
+
+
+# RenkiUserTable contains userid
+class RenkiUserTable(RenkiDataTable):
     user_id = Column('user_id', Integer, nullable=False)
 
 

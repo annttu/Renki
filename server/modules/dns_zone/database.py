@@ -4,12 +4,13 @@
 Database objects for dns_zone
 """
 
-from lib.database.table import RenkiBase, RenkiTable
-from sqlalchemy import Column,String,Boolean,Integer,ForeignKey
+from lib.database.table import RenkiBase, RenkiUserDataTable
+from sqlalchemy import Column, String, Boolean, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 from lib.database.tables import register_table
 
-class DNSZoneDatabase(RenkiBase, RenkiTable):
+
+class DNSZoneDatabase(RenkiBase, RenkiUserDataTable):
     __tablename__ = 'dns_zone'
     domain_id   = Column('domain_id',   Integer,    ForeignKey('domain.id'))
 
@@ -27,7 +28,8 @@ class DNSZoneDatabase(RenkiBase, RenkiTable):
 
     records     = relationship('DNSEntryDatabase', uselist=True, backref='dns_zone')
 
-class DNSEntryDatabase(RenkiBase, RenkiTable):
+
+class DNSEntryDatabase(RenkiBase, RenkiUserDataTable):
     __tablename__ = 'dns_record'
     all_record_types = ['A','AAAA','CNAME','NS','TXT','SRV','MX']
 

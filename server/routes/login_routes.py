@@ -17,7 +17,7 @@ def login_valid():
     Test if api key is valid
     """
     key = request.GET.get('key', '')
-    if not key:
+    if not key and request.json:
         key = request.json.get('key', '')
     if not key:
         abort(401, "key is mandatory")
