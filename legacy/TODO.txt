@@ -1,7 +1,0 @@
-Todo list for Services
-
-- www-root directory setting to vhosts
-
-Documentation TODO
-
-- Postgresql functions must be documented
