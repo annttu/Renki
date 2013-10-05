@@ -7,6 +7,7 @@ Easy user input parser and validator
 # Some of code here is ispired by django.forms
 
 from lib.exceptions import Invalid
+import string
 
 class Validator(object):
     def __init__(self, name, required=True, default=None):
@@ -14,8 +15,20 @@ class Validator(object):
         self.default = default
         self.required = required
 
-    def validate(self, value):
+    def cast(self, value):
+        """
+        Check and convert value to proper type or raise Invalid
+        """
         return value
+
+    def check(self, value):
+        """
+        Check that all requirement are met
+        """
+        return value
+
+    def validate(self, value):
+        return self.check(self.cast(value))
 
 def get_name(obj, default):
     if hasattr(obj, 'name'):
@@ -83,7 +96,6 @@ class BaseParser(object):
             validator = cls.base_validators[k]
             if validator.required:
                 raise Invalid('"%s" is required parameter!' % validator.name)
-            validator.validate(validator.default)
             out[validator.name] = validator.default
         return out
 
@@ -94,8 +106,20 @@ class InputParser(BaseParser, metaclass=DeclarativeParserMetaclass):
 
 
 class IntegerValidator(Validator):
+    def __init__(self, *args, positive=False, max=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.positive = positive
+        self.max = max
 
-    def validate(self, value):
+    def check(self, value):
+        if self.positive and value < 0:
+            raise Invalid("Integer %s is not positive" % value)
+        if self.max is not None:
+            if value > self.max:
+                raise Invalid("Integer %s is too big" % value)
+        return value
+
+    def cast(self, value):
         if isinstance(value, int):
             return value
         elif isinstance(value, str):
@@ -105,36 +129,62 @@ class IntegerValidator(Validator):
 
 
 class StringValidator(Validator):
-    def __init__(self, *args, permit_empty=False, **kwargs):
+    def __init__(self, *args, permit_empty=False, length=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.permit_empty = permit_empty
+        self.length = length
 
-    def not_empty(self, value):
-        if value:
-            return True
+    def check(self, value):
+        if not value:
+            if not self.permit_empty:
+                raise Invalid('String cannot be empty!')
+        elif self.length != None and len(value) > self.length:
+            raise Invalid("String is too long!")
+        return value
 
-    def validate(self, value):
-        if self.permit_empty:
-            if value == '' or value is None:
-                return ''
+    def cast(self, value):
+        if value is None:
+            return None
         if isinstance(value, str):
-            if self.not_empty(value) or self.permit_empty:
-                return value
+            return value
         raise Invalid('"%s" is not valid string' % value)
 
+
 class LimitedParser(InputParser):
-    pass
+    limit = IntegerValidator('limit', default=None, required=False)
+    offset = IntegerValidator('offset', default=None, required=False)
 
 
-class DomainValidator(Validator):
-    pass
+class DomainValidator(StringValidator):
+    def __init__(self, *args, **kwargs):
+        if not 'length' in kwargs:
+            kwargs['length'] = 256
+        kwargs['permit_empty'] = False
+        super().__init__(*args, **kwargs)
+
+    def check(self, value):
+        value = super().check(value)
+        value = value.lower()
+        if len(value) < 3:
+            raise Invalid("Domain must be at least 3 characters long")
+        elif '.' not in value:
+            raise Invalid("Domain must have at least one dot")
+        elif value.startswith('.'):
+            raise Invalid("Domain cannot begin with dot")
+        elif value.endswith('.') and '.' not in value[:-1]:
+            raise Invalid("Domain must have at least one dot in middle")
+        try:
+            value = value.encode("idna").decode("utf-8")
+        except:
+            raise Invalid("Domain contains invalid characters")
+        allowed = string.ascii_lowercase + string.digits + '-_.'
+        if value != ''.join([i for i in value if i in allowed]):
+            raise Invalid("Domain contains invalid characters")
+        return value
 
 
-if __name__ == '__main__':
-    class DomainGetInput(InputParser):
-        name = StringValidator('name')
-        id_ = IntegerValidator('id')
-
-    d = DomainGetInput.parse({'name': 'Veijo', 'id': '1'})
-    print(d)
-
+class UserIDValidator(IntegerValidator):
+    def __init__(self, *args, **kwargs):
+        kwargs['max'] = 999999
+        kwargs['positive'] = True
+        super().__init__(*args, **kwargs)
