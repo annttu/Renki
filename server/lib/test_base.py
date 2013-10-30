@@ -22,7 +22,7 @@ from jsonschema.exceptions import ValidationError as JSONValidationError
 
 
 # Initialize database connection
-connection.initialize_connection()
+connection.initialize_connection(unittest=True)
 
 def flush_tables():
     try:

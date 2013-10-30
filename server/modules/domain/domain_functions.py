@@ -46,12 +46,13 @@ def get_domain(name):
     except NoResultFound:
         return None
 
-def add_user_domain(user_id, name):
+def add_user_domain(user_id, name, comment=''):
     if get_domain(name) is not None:
         raise AlreadyExist('Domain "%s" already exists' % name)
     domain = DomainDatabase()
     domain.user_id = int(user_id)
     domain.name = name
+    domain.comment = comment
     domain.save()
     return domain
 
