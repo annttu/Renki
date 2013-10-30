@@ -8,6 +8,8 @@ Easy user input parser and validator
 
 from lib.exceptions import Invalid
 import string
+import copy
+
 
 class Validator(object):
     def __init__(self, name, required=True, default=None):
@@ -62,14 +64,12 @@ class BaseParser(object):
     # Parser logic implementation
 
     def __init__(self):
-
-
         # Because base_fields can be modifed
         self.validators = copy.deepcopy(self.base_validators)
 
     def __getitem__(self, name):
         try:
-            field = sef.validators[name]
+            field = self.validators[name]
         except KeyError:
             raise KeyError('Key %r not found in Parser' % name)
         return
@@ -79,7 +79,10 @@ class BaseParser(object):
         out = {}
         iterated = []
         for k, v in data.items():
-            if k not in cls.base_validators:
+            if k == 'key':
+                # Key is always ignored
+                continue
+            elif k not in cls.base_validators:
                 raise Invalid('Unknown parameter "%s"' % k)
             else:
                 error = None
@@ -98,7 +101,6 @@ class BaseParser(object):
                 raise Invalid('"%s" is required parameter!' % validator.name)
             out[validator.name] = validator.default
         return out
-
 
 
 class InputParser(BaseParser, metaclass=DeclarativeParserMetaclass):
@@ -184,7 +186,10 @@ class DomainValidator(StringValidator):
 
 
 class UserIDValidator(IntegerValidator):
-    def __init__(self, *args, **kwargs):
-        kwargs['max'] = 999999
-        kwargs['positive'] = True
-        super().__init__(*args, **kwargs)
+    def __init__(self, name):
+        kwargs = {
+            'max': 999999,
+            'positive': True,
+            'default': None
+        }
+        super().__init__(name, **kwargs)

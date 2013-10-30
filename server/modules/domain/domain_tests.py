@@ -83,10 +83,20 @@ class BaseDomainRouteTests(base.SimpleRouteTest):
                 "user_id": {
                     "type": "number",
                     "enum": [2]
-                    }
+                    },
+                "timestamp": {
+                    "type": "string",
+                    },
+                "waiting": {
+                    "type": "string"
+                    },
+                "comment": {
+                    "type": "string"
+                }
                 },
             "additionalProperties": False,
-            "required": ["status", "name", "id", "user_id"]
+            "required": ["status", "name", "id", "user_id",
+                         "timestamp", "waiting", "comment"]
         }
         self.do_test(route='/domains', method='PUT', args=args,
                      user=base.UserLevels.USER, response=schema,
@@ -117,7 +127,7 @@ class BaseDomainRouteTests(base.SimpleRouteTest):
                      status=base.APIResponses.OK)
 
     def test_domains_put_admin(self):
-        args = {'name': 'example.com', 'user_id': 2}
+        args = {'name': 'example.com', 'user_id': 2, 'comment': 'asdf'}
         schema = {
             'type': 'object',
             'properties': {
