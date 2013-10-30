@@ -15,8 +15,14 @@ _ARGS = [('DEBUG', False),
          ('DB_USER', 'renki'),
          ('DB_PASSWORD', ''),
          ('DB_SERVER', 'localhost'),
-         ('DB_PORT', 5432)
-         ]
+         ('DB_PORT', 5432),
+         ('DB_TEST_DATABASE', 'renki_test'),
+         ('DB_TEST_USER', 'renki'),
+         ('DB_TEST_PASSWORD', ''),
+         ('DB_TEST_SERVER', 'localhost'),
+         ('DB_TEST_PORT', 5432),
+         ('KEY_EXPIRE_TIME', 86400)
+]
 
 # Copy obvious values
 for it in _ARGS:

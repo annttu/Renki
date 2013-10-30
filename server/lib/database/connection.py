@@ -6,6 +6,7 @@ This file is part of Renki project
 
 from .tables import TABLES
 from .table import metadata
+from lib.exceptions import DatabaseError
 from lib import renki_settings as settings, renki
 
 
@@ -77,7 +78,23 @@ class DBConnection(object):
 
     @property
     def commit(self):
+        try:
+            xid = self._session.query(func.txid_current()).first()
+            logger.info("Transaction id: %s" % xid)
+            logger.debug("Commit")
+        except Exception as e:
+            logger.exception(e)
         return self._session.commit
+
+    def safe_commit(self):
+        try:
+            self.commit()
+            return True
+        except Exception as e:
+            logger.error(e)
+            logger.debug("Rollback")
+            self.rollback()
+        raise DatabaseError("Cannot save changes")
 
     @property
     def rollback(self):
@@ -160,23 +177,26 @@ class DBConnection(object):
     def __repr__(self):
         return self.__str__()
 
-def initialize_connection():
+def initialize_connection(unittest=False):
     """
     Create global database connection
     """
     global conn
-    conn = DBConnection(settings.DB_DATABASE, settings.DB_USER,
-                        settings.DB_PASSWORD, settings.DB_SERVER,
-                        settings.DB_PORT, echo=False)
+    if unittest:
+        logger.info("Using unittest database credentials")
+        conn = DBConnection(settings.DB_TEST_DATABASE, settings.DB_TEST_USER,
+                            settings.DB_TEST_PASSWORD, settings.DB_TEST_SERVER,
+                            settings.DB_TEST_PORT, echo=False)
+    else:
+        conn = DBConnection(settings.DB_DATABASE, settings.DB_USER,
+                            settings.DB_PASSWORD, settings.DB_SERVER,
+                            settings.DB_PORT, echo=False)
     # Add forced commit hook
     @renki.app.hook('after_request')
     def force_commit():
+        # Note: this isn't probably good idea
+        # If commit fails, data already sent to user, is lost.
         try:
-            xid = conn._session.query(func.txid_current()).first()
-            logger.info("Transaction id: %s" % xid)
-            logger.debug("Commit")
-            conn.commit()
+            conn.safe_commit()
         except Exception as e:
-            logger.error(e)
-            logger.debug("Rollback")
-            conn.rollback()
+            logger.exception(e)
