@@ -56,13 +56,15 @@ class RenkiTable(object):
         self._conn.delete(self)
         return True
 
-    def save(self):
+    def save(self, commit=False):
         """
         Save this object to database by updating existing row or inserting
         new one.
         """
         self.validate()
         self._conn.add(self)
+        if commit is True:
+            self._conn.save_commit()
         return True
 
     def as_dict(self):
