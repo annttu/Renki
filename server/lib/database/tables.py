@@ -1,8 +1,10 @@
 # encoding: utf-8
 
+from sqlalchemy.schema import MetaData
 
 TABLES = []
 
+metadata = MetaData()
 
 def register_table(table):
     """

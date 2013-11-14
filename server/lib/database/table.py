@@ -1,8 +1,11 @@
 # encoding: utf-8
 
 from lib.exceptions import Invalid, DoesNotExist, DatabaseError
+from lib.database.connection import session as dbsession
+from lib.database.tables import metadata
+
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.schema import MetaData
+
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.exc import SQLAlchemyError
@@ -18,7 +21,7 @@ class RenkiTable(object):
 
     @classmethod
     def query(cls):
-        return cls._conn.query(cls)
+        return dbsession.query(cls)
 
     @classmethod
     def get(cls, id_):
@@ -29,7 +32,7 @@ class RenkiTable(object):
                 logger.error("Get with invalid database id %s" % id_)
                 raise Invalid('ID must be integer')
             try:
-                c = cls._conn.query(cls).filter(
+                c = dbsession.query(cls).filter(
                     cls.id==id_).one()
             except NoResultFound:
                 raise DoesNotExist('Object with id %d does not exist' %
@@ -39,7 +42,6 @@ class RenkiTable(object):
                 raise DatabaseError('Cannot get object with id %d' % id_)
             return c
         raise Invalid('ID must be integer')
-
 
     def validate(self):
         """
@@ -53,7 +55,7 @@ class RenkiTable(object):
         """
         Delete this object from database
         """
-        self._conn.delete(self)
+        dbsession.delete(self)
         return True
 
     def save(self, commit=False):
@@ -62,9 +64,9 @@ class RenkiTable(object):
         new one.
         """
         self.validate()
-        self._conn.add(self)
+        dbsession.add(self)
         if commit is True:
-            self._conn.save_commit()
+            dbsession.save_commit()
         return True
 
     def as_dict(self):
@@ -98,5 +100,5 @@ class RenkiUserTable(RenkiDataTable):
     user_id = Column('user_id', Integer, nullable=False)
 
 
-metadata = MetaData()
+
 RenkiBase = declarative_base(cls=RenkiTable, metadata=metadata)

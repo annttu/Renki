@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
+import threading
+
 from .enums import JSON_STATUS
 
 import random
@@ -126,3 +128,14 @@ def generate_key(size=30):
     """
     chars = string.ascii_uppercase + string.ascii_lowercase + string.digits
     return ''.join(random.choice(chars) for x in range(size))
+
+def thread_local(name):
+    _lctx = threading.local()
+    def fget(self):
+        try:
+            return getattr(_lctx, name)
+        except AttributeError:
+            raise RuntimeError("Thread context not initialized.")
+    def fset(self, value): setattr(_lctx, name, value)
+    def fdel(self): delattr(_lctx, name)
+    return property(fget, fset, fdel, 'Thread-local property %s' % name)

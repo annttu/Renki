@@ -4,15 +4,13 @@
 This file is part of Renki project
 """
 
-from .tables import TABLES
-from .table import metadata
+from lib.database.tables import TABLES, metadata
 from lib.exceptions import DatabaseError
 from lib import renki_settings as settings, renki
-
+from lib.utils import thread_local
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import url
-from sqlalchemy.schema import MetaData
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import func
 
@@ -34,21 +32,15 @@ class DBConnection(object):
         self._port = port
         self.tables = {}
         self.__engine = None
-        self.__session = None
         self.__metadata = None
         self.__base = None
         self._echo = echo
         logger.info("Connecting to database")
-        self.connect()
         self._engine.connect()
+        self._sessionmaker = None
+        self.connect()
         logger.info("Database connection initialized")
         self._register_tables()
-
-    @property
-    def _session(self):
-        if not self.__session:
-            self._create_session()
-        return self.__session
 
     @property
     def _metadata(self):
@@ -68,41 +60,6 @@ class DBConnection(object):
             self._create_engine()
         return self.__engine
 
-    @property
-    def query(self):
-        return self._session.query
-
-    @property
-    def add(self):
-        return self._session.add
-
-    @property
-    def commit(self):
-        try:
-            xid = self._session.query(func.txid_current()).first()
-            logger.info("Transaction id: %s" % xid)
-            logger.debug("Commit")
-        except Exception as e:
-            logger.exception(e)
-        return self._session.commit
-
-    def safe_commit(self):
-        try:
-            self.commit()
-            return True
-        except Exception as e:
-            logger.error(e)
-            logger.debug("Rollback")
-            self.rollback()
-        raise DatabaseError("Cannot save changes")
-
-    @property
-    def rollback(self):
-        """
-        Rollback session
-        """
-        return self._session.rollback
-
     def _create_metadata(self):
         """
         Create SQLAlchemy metadata using same metadata object as with tables.
@@ -111,12 +68,14 @@ class DBConnection(object):
         # Bind engine to this connection
         self.__metadata._bind_to(self._engine)
 
-    def _create_session(self):
+    def create_session(self):
         """
         Initialize session
         """
-        Session = sessionmaker(bind=self._engine, autocommit=False)
-        self.__session = Session()
+        if self._sessionmaker is None:
+            self._sessionmaker = sessionmaker(bind=self._engine,
+                                              autocommit=False)
+        return self._sessionmaker()
 
     def _create_engine(self):
         """
@@ -126,7 +85,11 @@ class DBConnection(object):
                         username=self._username, password=self._password,
                         host=self._host, database=self._database,
                         port=self._port)
-        self.__engine = create_engine(dburl, echo=self._echo, pool_timeout=10)
+        # Note: pool_size defines the number of connections to keep open
+        # inside the connection pool.
+        self.__engine = create_engine(dburl, echo=self._echo, pool_timeout=10,
+                                      pool_size=5)
+
 
     def _register_tables(self):
         """
@@ -139,7 +102,8 @@ class DBConnection(object):
         """
         Connect to database
         """
-        self._create_session()
+        self._create_engine()
+        self._create_metadata()
 
     def create_tables(self):
         """
@@ -177,7 +141,61 @@ class DBConnection(object):
     def __repr__(self):
         return self.__str__()
 
-def initialize_connection(unittest=False):
+
+class LocalDBSession(object):
+    """
+    Thread-local session object.
+    """
+    _session = thread_local(name="session")
+
+    def query(self, *args, **kwargs):
+        ses = self.session()
+        print("Got session")
+        return ses.query(*args, **kwargs)
+
+    def add(self, *args, **kwargs):
+        return self.session().add(*args, **kwargs)
+
+    def session(self):
+        try:
+            return self._session
+        except RuntimeError:
+            print("Creating new session")
+            ses = conn.create_session()
+            self._session = ses
+        print("New session done")
+        return self._session
+
+    def commit(self, *args, **kwargs):
+        ses = self.session()
+        try:
+           xid = ses.query(func.txid_current()).first()
+           logger.info("Transaction id: %s" % xid)
+           logger.debug("Commit")
+        except Exception as e:
+            logger.exception(e)
+        return ses.commit(*args, **kwargs)
+
+    def safe_commit(self, *args, **kwargs):
+        try:
+            self.commit(*args, **kwargs)
+            return True
+        except Exception as e:
+            logger.error(e)
+            logger.debug("Rollback")
+            self.rollback()
+        raise DatabaseError("Cannot save changes")
+
+    def rollback(self, *args, **kwargs):
+        """
+        Rollback session
+        """
+        return self.session().rollback(*args, **kwargs)
+
+session = LocalDBSession()
+
+
+def initialize_connection(unittest=False, echo=False):
     """
     Create global database connection
     """
@@ -186,17 +204,17 @@ def initialize_connection(unittest=False):
         logger.info("Using unittest database credentials")
         conn = DBConnection(settings.DB_TEST_DATABASE, settings.DB_TEST_USER,
                             settings.DB_TEST_PASSWORD, settings.DB_TEST_SERVER,
-                            settings.DB_TEST_PORT, echo=False)
+                            settings.DB_TEST_PORT, echo=echo)
     else:
         conn = DBConnection(settings.DB_DATABASE, settings.DB_USER,
                             settings.DB_PASSWORD, settings.DB_SERVER,
-                            settings.DB_PORT, echo=False)
+                            settings.DB_PORT, echo=echo)
     # Add forced commit hook
     @renki.app.hook('after_request')
     def force_commit():
         # Note: this isn't probably good idea
         # If commit fails, data already sent to user, is lost.
         try:
-            conn.safe_commit()
+            session.safe_commit()
         except Exception as e:
             logger.exception(e)
