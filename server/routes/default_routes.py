@@ -60,14 +60,15 @@ def rollback():
     """
     Do database rollback
     """
-    if connection.conn._session.transaction.is_active:
+    sessio = connection.session.session()
+    if sessio.transaction.is_active:
         try:
-            xid = connection.conn._session.query(func.txid_current()).first()
+            xid = sessio.query(func.txid_current()).first()
             print("Transaction id: %s" % xid)
         except:
             pass
     logger.debug("Rollback due to error")
-    connection.conn.rollback()
+    sessio.rollback()
 
 @app.error(400)
 def error400(error):
