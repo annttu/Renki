@@ -24,7 +24,7 @@ def authenticated(func=None, inject_user=False):
                     if inject_user:
                         kwargs['user'] = mod.get_user(key)
                     return func(*args, **kwargs)
-            abort(401, "Invalid API key")
+            abort(401, "Invalid or missing API key")
         return wrapped
     if not func:
         def normal_wrapped(function):
@@ -35,6 +35,33 @@ def authenticated(func=None, inject_user=False):
 
 auth = authenticated
 
+def require_perm(func=None, permission=None):
+    """
+    Ensure user has permission `permission`
+
+    Note: This method always injects
+
+    TODO: Read http://bottlepy.org/docs/dev/plugindev.html !!!
+    """
+    def outer_wrapper(func):
+        @wraps(func)
+        def wrapped(*args, **kwargs):
+            key = get_apikey(request)
+            for mod in settings.AUTHENTICATION_MODULES:
+                if mod.valid_key(key):
+                    user = mod.get_user(key)
+                    if user.has_permission(permission) is not True:
+                        abort(403, "Insufficient permissions")
+                    kwargs['user'] = user
+                    return func(*args, **kwargs)
+            abort(401, "Invalid or missing API key")
+        return wrapped
+    if not func:
+        def normal_wrapped(function):
+            return outer_wrapper(function)
+        return normal_wrapped
+    else:
+        return outer_wrapper(func)
 
 def get_apikey(request):
     """

@@ -8,12 +8,12 @@ from bottle import response, request, abort
 from lib.renki import app
 from lib.utils import ok, error
 from lib.database import connection as dbconn
-from lib.auth.func import authenticated
+from lib.auth.func import authenticated, require_perm
 from .domain_functions import get_user_domains, get_domains, add_user_domain
 from .domain_validators import DomainGetValidator, UserDomainPutValidator
 from lib.exceptions import AlreadyExist, DatabaseError, RenkiHTTPError, \
     PermissionDenied
-
+import threading
 import logging
 
 logger = logging.getLogger('database/routes')
@@ -21,7 +21,7 @@ logger = logging.getLogger('database/routes')
 
 @app.get('/domains/')
 @app.get('/domains')
-@authenticated(inject_user=True)
+@require_perm(permission="domain_view_own")
 def get_domains_route(user):
     """
     GET /domains
@@ -29,12 +29,7 @@ def get_domains_route(user):
     domains = []
 
     data = dict(request.params.items())
-    if user.has_permission('domain_view_all'):
-        pass
-    elif user.has_permission('domain_view_own'):
-        data['user_id'] = user.user_id
-    else:
-        raise PermissionDenied("You don't have permission to view domains")
+    data['user_id'] = user.user_id
     params = DomainGetValidator.parse(data)
     try:
         domains = get_user_domains(**params)
@@ -45,6 +40,26 @@ def get_domains_route(user):
         raise RenkiHTTPError('Unknown error occured')
     return ok({'domains': [x.as_dict() for x in domains]})
 
+@app.get('/<user_id:int>/domains')
+@app.get('/<user_id:int>/domains/')
+@require_perm(permission="domain_view_all")
+def get_user_domains_route(user_id, user):
+    """
+    GET /user_id/domains
+    """
+    domains = []
+
+    data = dict(request.params.items())
+    data['user_id'] = user_id
+    params = DomainGetValidator.parse(data)
+    try:
+        domains = get_user_domains(**params)
+    except RenkiHTTPError:
+        raise
+    except Exception as e:
+        logger.exception(e)
+        raise RenkiHTTPError('Unknown error occured')
+    return ok({'domains': [x.as_dict() for x in domains]})
 
 @app.put('/domains')
 @app.put('/domains/')
