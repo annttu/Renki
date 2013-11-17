@@ -8,7 +8,6 @@ from lib.auth.authentication import User, Key, AuthenticationModule,\
 import random
 import string
 from hashlib import sha512
-from base64 import b64encode, b64decode
 
 """
 Dummy authentication module

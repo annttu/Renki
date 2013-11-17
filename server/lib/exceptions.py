@@ -1,7 +1,8 @@
 # encoding: utf-8
 
-import json
+import traceback
 from bottle import HTTPError
+from lib import renki_settings
 
 class RenkiException(Exception):
     def __init__(self, msg):
@@ -14,6 +15,8 @@ class RenkiException(Exception):
 class RenkiHTTPError(HTTPError):
     STATUS = 500
     def __init__(self, msg):
+        if renki_settings.DEBUG is True:
+            traceback.print_stack()
         exception = RenkiException(msg)
         super(RenkiHTTPError, self).__init__(status=self.STATUS,
                                              exception=exception)

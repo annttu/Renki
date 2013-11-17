@@ -16,7 +16,7 @@ from sqlalchemy.orm.exc import NoResultFound
 
 def get_domains(user_id=None, limit=None, offset=None):
     query =  DomainDatabase.query()
-    if user_id:
+    if user_id is not None:
         if is_positive_numeric(user_id) is not True:
             raise Invalid('User id must be positive integer')
         query = query.filter(DomainDatabase.user_id==user_id)

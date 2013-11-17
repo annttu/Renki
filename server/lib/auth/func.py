@@ -2,6 +2,7 @@
 
 from bottle import request, abort
 from lib import renki_settings as settings
+from lib.auth import permissions
 
 import logging
 from functools import wraps
@@ -39,10 +40,11 @@ def require_perm(func=None, permission=None):
     """
     Ensure user has permission `permission`
 
-    Note: This method always injects
+    Note: This method always injects user to function
 
     TODO: Read http://bottlepy.org/docs/dev/plugindev.html !!!
     """
+    permissions.register_permission(permission)
     def outer_wrapper(func):
         @wraps(func)
         def wrapped(*args, **kwargs):
@@ -50,6 +52,9 @@ def require_perm(func=None, permission=None):
             for mod in settings.AUTHENTICATION_MODULES:
                 if mod.valid_key(key):
                     user = mod.get_user(key)
+                    if not user:
+                        logger.error('Bug: Key exist but user not found!')
+                        continue
                     if user.has_permission(permission) is not True:
                         abort(403, "Insufficient permissions")
                     kwargs['user'] = user

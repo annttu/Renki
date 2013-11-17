@@ -5,6 +5,8 @@ from lib import check_settings
 from lib import renki, renki_settings as settings
 from lib.database.connection import initialize_connection
 
+# Importing routes and modules registers also tables
+import lib.auth.db
 import routes
 import modules
 

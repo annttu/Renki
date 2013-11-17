@@ -150,7 +150,6 @@ class LocalDBSession(object):
 
     def query(self, *args, **kwargs):
         ses = self.session()
-        print("Got session")
         return ses.query(*args, **kwargs)
 
     def add(self, *args, **kwargs):
@@ -160,10 +159,8 @@ class LocalDBSession(object):
         try:
             return self._session
         except RuntimeError:
-            print("Creating new session")
             ses = conn.create_session()
             self._session = ses
-        print("New session done")
         return self._session
 
     def commit(self, *args, **kwargs):

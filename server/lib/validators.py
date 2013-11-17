@@ -2,6 +2,20 @@
 
 from .exceptions import Invalid
 import netaddr
+from datetime import datetime
+import inspect
+
+
+def get_var_name(default):
+    """
+    Try to fetch caller variable name
+    """
+    try:
+        var = inspect.getframeinfo(inspect.stack()[2][0])[3][0].split('(')[-1].split(')')[0]
+        var = var.replace('self.','').split(',')[0].strip()
+        return var
+    except:
+        return default
 
 def validate_domain(value, name="Value"):
     """
@@ -120,17 +134,32 @@ def is_positive_numeric(value, zero_included=True):
     except:
         return False
 
-def validate_string(value, name="Value"):
+def validate_string(value, name=None):
     """
     Test if value is string.
 
     @param value: value to test
     @type value: any
     """
+    if not name:
+        name = get_var_name('Value')
     if isinstance(value, str):
         return value
     raise Invalid("%s must be string, not %s" % (name, type(value)))
 
+
+def validate_datetime(value, in_future=False):
+    """
+    Test if value is datetime object.
+    If in_future is true, test also that datetime is in future
+    """
+    name = get_var_name('datetime')
+    if not isinstance(value, datetime):
+        raise Invalid("%s must be datetime, not %s" % (name, type(value)))
+    if in_future is True:
+        if value <= datetime.now():
+            raise Invalid("%s must be in future" % (name))
+    return value
 
 def cast_as_int(value):
     """

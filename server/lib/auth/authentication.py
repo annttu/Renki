@@ -67,6 +67,12 @@ class Key(object):
 class AuthenticationModule(object):
     NAME = "NotNamed"
 
+    def register_user(self, user_id, username, password,
+                      firstnames='', lastname=''):
+        """
+        Create user `username` with user id `user_id` and password `password`
+        """
+        pass
 
     def has_permission(self, key, perm):
         """
