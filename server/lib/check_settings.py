@@ -35,13 +35,15 @@ def set_settings():
     for name, default in defaults.items():
         if name.startswith('__') or name in ['REQUIRED']:
             continue
-        if default == rsettings.REQUIRED and getattr(settings, name) is None:
+        value = getattr(settings, name, None)
+        if default == rsettings.REQUIRED and value is None:
             raise SettingError("%s is required setting" % name)
-        setattr(rsettings, name, getattr(settings, name, default))
+        elif value is None:
+            continue
+        setattr(rsettings, name, getattr(settings, name))
 
     # Import authentication module
     rsettings.AUTHENTICATION_MODULES = import_modules(
                                             settings.AUTHENTICATION_MODULES)
 
-
-    logging.config.dictConfig(settings.LOGGING)
+    logging.config.dictConfig(rsettings.LOGGING)

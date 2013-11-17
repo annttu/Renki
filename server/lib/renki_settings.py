@@ -83,7 +83,6 @@ AUTHENTICATION_MODULES = []
 DEBUG = True
 BIND_HOST = 'localhost'
 BIND_PORT = 8080
-LOGGING = {}
 DB_DATABASE = 'renki'
 DB_USER = 'renki'
 DB_PASSWORD = ''
