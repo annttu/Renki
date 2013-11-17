@@ -6,4 +6,5 @@ database.sql
 *.swp
 tests/unittests_db.py
 server/local_settings.py
+server/settings.py
 legacy/

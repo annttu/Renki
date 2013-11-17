@@ -1,0 +1,44 @@
+# encoding: utf-8
+
+DEBUG = True
+BIND_HOST = '127.0.0.1'
+BIND_PORT = 8080
+
+######################
+### Authentication ###
+######################
+
+AUTHENTICATION_MODULES = ('lib.auth.basic.BasicAuthenticationModule',)
+KEY_EXPIRE_TIME = 86400 # Seconds
+# Change this before using!
+AUTH_SECRET = 'ea1hiequoRooTh.ook#ai6if]oo4agh2feeth[oose2ufek6suDo@i5Eesh:ais6'
+
+
+################
+### Database ###
+################
+
+DB_DATABASE = 'renki'
+DB_USER = 'renki'
+DB_PASSWORD = 'secret'
+DB_SERVER = '127.0.0.1'
+DB_PORT = 5432
+
+##############################
+### Database for unit tests ##
+##############################
+
+DB_TEST_DATABASE = 'renki_test'
+DB_TEST_USER = 'renki'
+DB_TEST_PASSWORD = 'secret'
+DB_TEST_SERVER = '127.0.0.1'
+DB_TEST_PORT = 5432
+
+###############
+### Logging ###
+###############
+
+try:
+    from local_settings import *
+except ImportError:
+    pass

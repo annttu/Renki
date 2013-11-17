@@ -1,50 +1,98 @@
-# encoding: utf-8
+#encoding: utf-8
 
-import settings
-from .exceptions import SettingError
+"""
+This settings module is dynamically populated by lib.check_settings.
+"""
 
-import logging
-import logging.config
+class REQUIRED:
+    """
+    This setting doesn't have default value
+    """
+    pass
 
-LOGGING = {}
-_ARGS = [('DEBUG', False),
-         ('BIND_HOST', 'localhost'),
-         ('BIND_PORT', 8080),
-         ('LOGGING', {}),
-         ('DB_DATABASE', 'renki'),
-         ('DB_USER', 'renki'),
-         ('DB_PASSWORD', ''),
-         ('DB_SERVER', 'localhost'),
-         ('DB_PORT', 5432),
-         ('DB_TEST_DATABASE', 'renki_test'),
-         ('DB_TEST_USER', 'renki'),
-         ('DB_TEST_PASSWORD', ''),
-         ('DB_TEST_SERVER', 'localhost'),
-         ('DB_TEST_PORT', 5432),
-         ('KEY_EXPIRE_TIME', 86400)
-]
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': True,
+    'formatters': {
+        'verbose': {
+            'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s'
+        },
+        'simple': {
+            '()': 'logging.Formatter',
+            'format': '%(asctime)-20s %(levelname)s %(module)s %(message)s'
+        }
+    },
+    'filters': {
+    },
+    'handlers': {
+        'null': {
+            'level': 'DEBUG',
+            'class': 'logging.NullHandler',
+        },
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple'
+        }
+    },
+    'loggers': {
+        'routes': {
+            'handlers': ['console'],
+            'propagate': True,
+            'level': 'INFO',
+        },
+        'server': {
+            'handlers': ['console'],
+            'propagate': True,
+            'level': 'INFO',
+        },
+        'login_routes': {
+            'handlers': ['console'],
+            'propagate': True,
+            'level': 'INFO',
+        },
+        'create_tables': {
+            'handlers': ['console'],
+            'propagate': True,
+            'level': 'INFO',
+        },
+        'dbconnection': {
+            'handlers': ['console'],
+            'propagate': True,
+            'level': 'DEBUG',
+        },
+        'database/routes': {
+            'handlers': ['console'],
+            'propagate': True,
+            'level': 'DEBUG',
+        },
+        'BasicAuthentication': {
+            'handlers': ['console'],
+            'propagate': True,
+            'level': 'DEBUG',
+        },
+        'auth.db': {
+            'handlers': ['console'],
+            'propagate': True,
+            'level': 'DEBUG',
+        }
+     }
+}
 
-# Copy obvious values
-for it in _ARGS:
-    name = it[0]
-    globals()[name] = getattr(settings, name, it[1])
 
-
-# Import authentication module
 AUTHENTICATION_MODULES = []
-import_failed = None
-for mod in settings.AUTHENTICATION_MODULES:
-    try:
-        from_ = '.'.join(mod.split('.')[:-1])
-        module_ = mod.split('.')[-1]
-        authmod = __import__(from_, fromlist=[module_])
-        AUTHENTICATION_MODULES.append(vars(authmod)[module_]())
-    except ImportError as e:
-        import_failed = e
-        break
-if import_failed:
-    raise SettingError('Cannot import module: %s' %
-                       import_failed)
-
-
-logging.config.dictConfig(LOGGING)
+DEBUG = True
+BIND_HOST = 'localhost'
+BIND_PORT = 8080
+LOGGING = {}
+DB_DATABASE = 'renki'
+DB_USER = 'renki'
+DB_PASSWORD = ''
+DB_SERVER = 'localhost'
+DB_PORT = 5432
+DB_TEST_DATABASE = 'renki_test'
+DB_TEST_USER = 'renki'
+DB_TEST_PASSWORD = ''
+DB_TEST_SERVER = 'localhost'
+DB_TEST_PORT = 5432
+KEY_EXPIRE_TIME = 86400
+AUTH_SECRET = REQUIRED

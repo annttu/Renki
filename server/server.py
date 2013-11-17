@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
+from lib import check_settings
 from lib import renki, renki_settings as settings
 from lib.database.connection import initialize_connection
+
 import routes
 import modules
 
@@ -10,6 +12,7 @@ from bottle import run
 import logging
 
 if __name__ == '__main__':
+    check_settings.set_settings()
     logger = logging.getLogger('server')
     # Run server
     logger.info("Starting server")
