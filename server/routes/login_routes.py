@@ -4,6 +4,7 @@ from bottle import request, abort
 from lib.renki import app, __version__ as version
 from lib.utils import ok as ret_ok, error as ret_error
 from lib import renki_settings as settings
+from lib.database import connection
 from lib.exceptions import AuthenticationFailed
 
 
@@ -37,6 +38,7 @@ def login_route():
     for mod in settings.AUTHENTICATION_MODULES:
         try:
             key = mod.authenticate(username=username, password=password)
+            connection.session.safe_commit()
             logger.info("User %s has successfully authenticated" % username)
             return ret_ok({'key': key})
         except AuthenticationFailed:
