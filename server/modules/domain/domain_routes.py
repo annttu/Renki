@@ -4,19 +4,20 @@
 Domain routes
 """
 
-from bottle import response, request, abort
+from bottle import request
 from lib.renki import app
 from lib.utils import ok, error
 from lib.database import connection as dbconn
-from lib.auth.func import authenticated, require_perm
-from .domain_functions import get_user_domains, get_domains, add_user_domain
-from .domain_validators import DomainGetValidator, UserDomainPutValidator
+from lib.auth.func import require_perm
+from .domain_functions import get_user_domains, add_user_domain, \
+    get_domain_by_id
+from .domain_validators import DomainGetValidator, UserDomainPutValidator, \
+    DomainIDValidator
 from lib.exceptions import AlreadyExist, DatabaseError, RenkiHTTPError, \
-    PermissionDenied
-import threading
+    DoesNotExist
 import logging
 
-logger = logging.getLogger('database/routes')
+logger = logging.getLogger('domain_routes')
 
 
 @app.get('/domains/')
@@ -37,7 +38,7 @@ def get_domains_route(user):
         raise
     except Exception as e:
         logger.exception(e)
-        raise RenkiHTTPError('Unknown error occured')
+        raise RenkiHTTPError('Unknown error occurred')
     return ok({'domains': [x.as_dict() for x in domains]})
 
 @app.get('/<user_id:int>/domains')
@@ -60,7 +61,7 @@ def get_user_domains_route(user_id, user):
         raise
     except Exception as e:
         logger.exception(e)
-        raise RenkiHTTPError('Unknown error occured')
+        raise RenkiHTTPError('Unknown error occurred')
     return ok({'domains': [x.as_dict() for x in domains]})
 
 @app.post('/domains')
@@ -83,7 +84,7 @@ def domains_add_route(user):
         raise
     except Exception as e:
         logger.exception(e)
-        raise RenkiHTTPError('Unknown error occured')
+        raise RenkiHTTPError('Unknown error occurred')
     dbconn.session.safe_commit()
     return ok(domain.as_dict())
 
@@ -93,7 +94,7 @@ def domains_add_route(user):
 @require_perm(permission="domain_modify_all")
 def admin_domains_add_route(user):
     """
-    Admins add domain route
+    Administrators add domain route
 
     TODO: Check that user_id exists!
     """
@@ -109,6 +110,66 @@ def admin_domains_add_route(user):
         raise
     except Exception as e:
         logger.exception(e)
-        raise RenkiHTTPError('Unknown error occured')
+        raise RenkiHTTPError('Unknown error occurred')
     dbconn.session.safe_commit()
     return ok(domain.as_dict())
+
+@app.get('/domains/<domain_id:int>')
+@app.get('/domains/<domain_id:int>/')
+@require_perm(permission="domain_view_own")
+def domains_get_domain(user, domain_id):
+    """
+    GET /domains/domain_id route
+    """
+    data = {'user_id' : user.id, 'domain_id': domain_id}
+    data = DomainIDValidator.parse(data)
+    domain = get_domain_by_id(int(domain_id), user_id=int(user.id))
+    if domain is None:
+        raise DoesNotExist("Domain id=%s does not exist" % domain_id)
+    return ok(domain.as_dict())
+
+@app.get('/<user_id:int>/domains/<domain_id:int>')
+@app.get('/<user_id:int>/domains/<domain_id:int>/')
+@require_perm(permission="domain_view_all")
+def domains_get_domain_admin(user, user_id, domain_id):
+    """
+    GET /domains/domain_id route
+    """
+    data = {'user_id' : user_id, 'domain_id': domain_id}
+    data = DomainIDValidator.parse(data)
+    domain = get_domain_by_id(int(domain_id), user_id=int(user_id))
+    if domain is None:
+        raise DoesNotExist("Domain id=%s does not exist" % domain_id)
+    return ok(domain.as_dict())
+
+@app.delete('/domains/<domain_id:int>')
+@app.delete('/domains/<domain_id:int>/')
+@require_perm(permission="domain_modify_own")
+def domains_delete_domain(user, domain_id):
+    """
+    DELETE /domains/domain_id route
+    """
+    data = {'user_id' : user.id, 'domain_id': domain_id}
+    data = DomainIDValidator.parse(data)
+    domain = get_domain_by_id(int(domain_id), user_id=int(user.id))
+    if domain is None:
+        raise DoesNotExist("Domain id=%s does not exist" % domain_id)
+    domain.delete()
+    dbconn.session.safe_commit()
+    return ok({})
+
+@app.delete('/<user_id:int>/domains/<domain_id:int>')
+@app.delete('/<user_id:int>/domains/<domain_id:int>/')
+@require_perm(permission="domain_modify_all")
+def domains_delete_domain_admin(user, user_id, domain_id):
+    """
+    DELETE /domains/domain_id route
+    """
+    data = {'user_id' : user_id, 'domain_id': domain_id}
+    data = DomainIDValidator.parse(data)
+    domain = get_domain_by_id(int(domain_id), user_id=int(user.id))
+    if domain is None:
+        raise DoesNotExist("Domain id=%s does not exist" % domain_id)
+    domain.delete()
+    dbconn.session.safe_commit()
+    return ok({})

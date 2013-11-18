@@ -16,3 +16,7 @@ class UserDomainPutValidator(InputParser):
     name = DomainValidator('name')
     comment = StringValidator('comment', permit_empty=True, length=512)
 
+
+class DomainIDValidator(InputParser):
+    user_id = UserIDValidator('user_id')
+    domain_id = IntegerValidator('domain_id', positive=True, required=True)

@@ -39,10 +39,21 @@ def get_user_domains(user_id, limit=None, offset=None):
     return get_domains(user_id=user_id, limit=limit, offset=offset)
 
 
-def get_domain(name):
+def get_domain(name, user_id=None):
     query = DomainDatabase.query()
+    if user_id is not None:
+        query = query.filter(DomainDatabase.user_id == user_id)
     try:
         return query.filter(DomainDatabase.name == name).one()
+    except NoResultFound:
+        return None
+
+def get_domain_by_id(domain_id, user_id=None):
+    query = DomainDatabase.query()
+    if user_id is not None:
+        query = query.filter(DomainDatabase.user_id == user_id)
+    try:
+        return query.filter(DomainDatabase.id == domain_id).one()
     except NoResultFound:
         return None
 
