@@ -7,7 +7,7 @@ Domain logic
 
 from .domain_database import DomainDatabase
 
-from lib.exceptions import AlreadyExist, Invalid
+from lib.exceptions import AlreadyExist, Invalid, DoesNotExist
 from lib.validators import is_positive_numeric
 from lib.database.filters import do_limits
 
@@ -46,7 +46,8 @@ def get_domain(name, user_id=None):
     try:
         return query.filter(DomainDatabase.name == name).one()
     except NoResultFound:
-        return None
+        pass
+    raise DoesNotExist("Domain name=%s does not exist" % name)
 
 def get_domain_by_id(domain_id, user_id=None):
     query = DomainDatabase.query()
@@ -55,11 +56,15 @@ def get_domain_by_id(domain_id, user_id=None):
     try:
         return query.filter(DomainDatabase.id == domain_id).one()
     except NoResultFound:
-        return None
+        pass
+    raise DoesNotExist("Domain id=%s does not exist" % domain_id)
 
 def add_user_domain(user_id, name, comment=''):
-    if get_domain(name) is not None:
+    try:
+        get_domain(name)
         raise AlreadyExist('Domain "%s" already exists' % name)
+    except DoesNotExist:
+        pass
     domain = DomainDatabase()
     domain.user_id = int(user_id)
     domain.name = name

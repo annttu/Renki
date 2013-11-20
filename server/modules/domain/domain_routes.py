@@ -6,13 +6,13 @@ Domain routes
 
 from bottle import request
 from lib.renki import app
-from lib.utils import ok, error
+from lib.utils import ok, error, request_data
 from lib.database import connection as dbconn
 from lib.auth.func import require_perm
 from .domain_functions import get_user_domains, add_user_domain, \
     get_domain_by_id
 from .domain_validators import DomainGetValidator, UserDomainPutValidator, \
-    DomainIDValidator
+    DomainIDValidator, DomainEditValidator
 from lib.exceptions import AlreadyExist, DatabaseError, RenkiHTTPError, \
     DoesNotExist
 import logging
@@ -124,8 +124,6 @@ def domains_get_domain(user, domain_id):
     data = {'user_id' : user.id, 'domain_id': domain_id}
     data = DomainIDValidator.parse(data)
     domain = get_domain_by_id(int(domain_id), user_id=int(user.id))
-    if domain is None:
-        raise DoesNotExist("Domain id=%s does not exist" % domain_id)
     return ok(domain.as_dict())
 
 @app.get('/<user_id:int>/domains/<domain_id:int>')
@@ -138,8 +136,6 @@ def domains_get_domain_admin(user, user_id, domain_id):
     data = {'user_id' : user_id, 'domain_id': domain_id}
     data = DomainIDValidator.parse(data)
     domain = get_domain_by_id(int(domain_id), user_id=int(user_id))
-    if domain is None:
-        raise DoesNotExist("Domain id=%s does not exist" % domain_id)
     return ok(domain.as_dict())
 
 @app.delete('/domains/<domain_id:int>')
@@ -152,8 +148,6 @@ def domains_delete_domain(user, domain_id):
     data = {'user_id' : user.id, 'domain_id': domain_id}
     data = DomainIDValidator.parse(data)
     domain = get_domain_by_id(int(domain_id), user_id=int(user.id))
-    if domain is None:
-        raise DoesNotExist("Domain id=%s does not exist" % domain_id)
     domain.delete()
     dbconn.session.safe_commit()
     return ok({})
@@ -168,8 +162,44 @@ def domains_delete_domain_admin(user, user_id, domain_id):
     data = {'user_id' : user_id, 'domain_id': domain_id}
     data = DomainIDValidator.parse(data)
     domain = get_domain_by_id(int(domain_id), user_id=int(user.id))
-    if domain is None:
-        raise DoesNotExist("Domain id=%s does not exist" % domain_id)
     domain.delete()
+    dbconn.session.safe_commit()
+    return ok({})
+
+# Post /domains/<domain_id>/ to update parts of domain, e.g. comment
+@app.post('/domains/<domain_id:int>')
+@app.post('/domains/<domain_id:int>/')
+@require_perm(permission="domain_modify_own")
+def domains_modify_domain(user, domain_id):
+    """
+    POST /domains/domain_id route
+    """
+    data = request_data()
+    data['user_id'] = user.id
+    data['domain_id'] = domain_id
+    data = DomainEditValidator.parse(data)
+    domain = get_domain_by_id(int(domain_id), user_id=int(user.id))
+    if 'comment' in data and data['comment'] is not None:
+        print("Updating comment")
+        domain.comment = data['comment']
+    domain.save()
+    dbconn.session.safe_commit()
+    return ok({})
+
+@app.post('/<user_id:int>/domains/<domain_id:int>')
+@app.post('/<user_id:int>/domains/<domain_id:int>/')
+@require_perm(permission="domain_modify_own")
+def domains_modify_domain_admin(user, user_id, domain_id):
+    """
+    POST /domains/domain_id route
+    """
+    data = request_data()
+    data['user_id'] = user_id
+    data['domain_id'] = domain_id
+    data = DomainEditValidator.parse(data)
+    domain = get_domain_by_id(int(domain_id), user_id=int(user.id))
+    if 'comment' in data and data['comment'] is not None:
+        domain.comment = data['comment']
+    domain.save()
     dbconn.session.safe_commit()
     return ok({})
