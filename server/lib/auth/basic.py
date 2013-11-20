@@ -28,6 +28,8 @@ class BasicAuthenticationModule(AuthenticationModule):
         """
         Find right key
         """
+        if not key:
+            return None
         try:
             return db.AuthKeys.get_key(key)
         except DoesNotExist:
