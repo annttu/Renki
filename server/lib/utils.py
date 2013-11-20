@@ -1,12 +1,18 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-import threading
-
+from .exceptions import Invalid
 from .enums import JSON_STATUS
+
+import threading
+from bottle import request
+
 
 import random
 import string
+
+import logging
+logger = logging.getLogger('utils')
 
 OK_STATUS = 'OK'
 ERROR_STATUS = 'ERROR'
@@ -128,6 +134,24 @@ def generate_key(size=30):
     """
     chars = string.ascii_uppercase + string.ascii_lowercase + string.digits
     return ''.join(random.choice(chars) for x in range(size))
+
+def request_data():
+    """
+    Get data given by post of put request.
+    request variable points always to right context (thread local magic).
+    """
+    try:
+        data = request.json
+        if not data:
+            if len(request.params) > 100:
+                raise Invalid("Too many parameters on input")
+            data = dict(request.params.items())
+        return data
+    except Invalid:
+        raise
+    except Exception as e:
+        logger.exception(e)
+    raise Invalid("Invalid input")
 
 def thread_local(name):
     _lctx = threading.local()
