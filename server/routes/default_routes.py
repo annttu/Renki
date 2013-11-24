@@ -64,7 +64,7 @@ def rollback():
     if sessio.transaction.is_active:
         try:
             xid = sessio.query(func.txid_current()).first()
-            print("Transaction id: %s" % xid)
+            logger.info("Transaction id: %s" % xid)
         except:
             pass
     logger.debug("Rollback due to error")

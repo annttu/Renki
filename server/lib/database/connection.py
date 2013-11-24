@@ -158,6 +158,9 @@ class LocalDBSession(object):
     def delete(self, *args, **kwargs):
         return self.session().delete(*args, **kwargs)
 
+    def flush(self, *args, **kwargs):
+        return self.session().flush(*args, **kwargs)
+
     def session(self):
         try:
             return self._session

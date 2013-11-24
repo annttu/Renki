@@ -22,7 +22,7 @@ logger = logging.getLogger('domain_routes')
 
 @app.get('/domains/')
 @app.get('/domains')
-@require_perm(permission="domain_view_own")
+@require_perm(permission="domains_view_own")
 def get_domains_route(user):
     """
     GET /domains
@@ -43,7 +43,7 @@ def get_domains_route(user):
 
 @app.get('/<user_id:int>/domains')
 @app.get('/<user_id:int>/domains/')
-@require_perm(permission="domain_view_all")
+@require_perm(permission="domains_view_all")
 def get_user_domains_route(user_id, user):
     """
     GET /user_id/domains
@@ -66,7 +66,7 @@ def get_user_domains_route(user_id, user):
 
 @app.post('/domains')
 @app.post('/domains/')
-@require_perm(permission="domain_modify_own")
+@require_perm(permission="domains_modify_own")
 def domains_add_route(user):
     """
     Add domain route
@@ -91,7 +91,7 @@ def domains_add_route(user):
 
 @app.post('/<user_id:int>/domains')
 @app.post('/<user_id:int>/domains/')
-@require_perm(permission="domain_modify_all")
+@require_perm(permission="domains_modify_all")
 def admin_domains_add_route(user):
     """
     Administrators add domain route
@@ -116,7 +116,7 @@ def admin_domains_add_route(user):
 
 @app.get('/domains/<domain_id:int>')
 @app.get('/domains/<domain_id:int>/')
-@require_perm(permission="domain_view_own")
+@require_perm(permission="domains_view_own")
 def domains_get_domain(user, domain_id):
     """
     GET /domains/domain_id route
@@ -128,7 +128,7 @@ def domains_get_domain(user, domain_id):
 
 @app.get('/<user_id:int>/domains/<domain_id:int>')
 @app.get('/<user_id:int>/domains/<domain_id:int>/')
-@require_perm(permission="domain_view_all")
+@require_perm(permission="domains_view_all")
 def domains_get_domain_admin(user, user_id, domain_id):
     """
     GET /domains/domain_id route
@@ -140,7 +140,7 @@ def domains_get_domain_admin(user, user_id, domain_id):
 
 @app.delete('/domains/<domain_id:int>')
 @app.delete('/domains/<domain_id:int>/')
-@require_perm(permission="domain_modify_own")
+@require_perm(permission="domains_modify_own")
 def domains_delete_domain(user, domain_id):
     """
     DELETE /domains/domain_id route
@@ -154,7 +154,7 @@ def domains_delete_domain(user, domain_id):
 
 @app.delete('/<user_id:int>/domains/<domain_id:int>')
 @app.delete('/<user_id:int>/domains/<domain_id:int>/')
-@require_perm(permission="domain_modify_all")
+@require_perm(permission="domains_modify_all")
 def domains_delete_domain_admin(user, user_id, domain_id):
     """
     DELETE /domains/domain_id route
@@ -169,7 +169,7 @@ def domains_delete_domain_admin(user, user_id, domain_id):
 # Post /domains/<domain_id>/ to update parts of domain, e.g. comment
 @app.post('/domains/<domain_id:int>')
 @app.post('/domains/<domain_id:int>/')
-@require_perm(permission="domain_modify_own")
+@require_perm(permission="domains_modify_own")
 def domains_modify_domain(user, domain_id):
     """
     POST /domains/domain_id route
@@ -188,7 +188,7 @@ def domains_modify_domain(user, domain_id):
 
 @app.post('/<user_id:int>/domains/<domain_id:int>')
 @app.post('/<user_id:int>/domains/<domain_id:int>/')
-@require_perm(permission="domain_modify_own")
+@require_perm(permission="domains_modify_own")
 def domains_modify_domain_admin(user, user_id, domain_id):
     """
     POST /domains/domain_id route

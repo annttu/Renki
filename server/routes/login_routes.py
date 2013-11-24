@@ -30,6 +30,7 @@ def login_valid():
 
 @app.post('/login')
 def login_route():
+    connection.session.rollback()
     username = request.POST.get('username', '')
     password = request.POST.get('password', '')
     if not username or not password:
@@ -37,6 +38,7 @@ def login_route():
         password = request.json.get('password', '')
     for mod in settings.AUTHENTICATION_MODULES:
         try:
+
             key = mod.authenticate(username=username, password=password)
             connection.session.safe_commit()
             logger.info("User %s has successfully authenticated" % username)
