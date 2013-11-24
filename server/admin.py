@@ -74,7 +74,8 @@ def setup_development_users():
         if perm.name.endswith('own'):
             test.permissions.append(perm)
         admin.permissions.append(perm)
-
+    test.save()
+    admin.save()
 
 
 if __name__ == '__main__':
