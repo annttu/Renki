@@ -16,7 +16,7 @@ logger = logging.getLogger('default_routes')
 
 @app.get('/')
 def index_route():
-    return ret_ok({'name': 'Renki service management system API'})
+    return ret_ok({'info': 'Renki service management system API'})
 
 
 @app.get('/version')

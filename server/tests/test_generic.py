@@ -1,66 +1,72 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-import unittest
-from lib.test_base import BaseRoutesTest, APIResponses
+from lib.test_utils import *
 
 
-class TestIndexRoute(BaseRoutesTest):
+class TestIndexRoute(BasicTest):
     """
     Test / route
     """
-    LOGIN_REQUIRED = False
-    IGNORE_DATABASE_FLUSH = True
-    ROUTINE = '/'
-    DEFAULT_RETVAL = APIResponses.OK
-    POST_RETVAL = APIResponses.NOTALLOWED
-    PUT_RETVAL = APIResponses.NOTALLOWED
-    DELETE_RETVAL = APIResponses.NOTALLOWED
-    IGNORE_TEST = False
+
+    schema = [
+        JSONString('info', required=True)
+    ]
+
+    def test_root_get_anon(self):
+        """
+        Test GET / route as anonymous
+        """
+        self.assertQ('/', user=None, status=STATUS_OK, schema=self.schema)
+
+    def test_root_get_user(self):
+        """
+        Test GET / route as user
+        """
+        u = self.user('test', [])
+        self.assertQ('/', user=u, status=STATUS_OK, schema=self.schema)
 
 
-class TestVersionRoute(BaseRoutesTest):
+class TestVersionRoute(BasicTest):
     """
     Test /versin route
     """
-    LOGIN_REQUIRED = False
-    IGNORE_DATABASE_FLUSH = True
-    ROUTINE = '/version'
-    DEFAULT_RETVAL = APIResponses.OK
-    POST_RETVAL = APIResponses.NOTALLOWED
-    PUT_RETVAL = APIResponses.NOTALLOWED
-    DELETE_RETVAL = APIResponses.NOTALLOWED
-    IGNORE_TEST = False
 
-    RESPONSE_SCHEMA = {
-        'type': "object",
-        'properties': {
-            'version': {'type': 'string'},
-        },
-        'required': ['version']
-    }
+    schema = [
+        JSONString('version', required=True)
+    ]
 
+    def test_version_get_anon(self):
+        """
+        Test GET /version route as anonymous
+        """
+        self.assertQ('/version', user=None, status=STATUS_OK,
+                     schema=self.schema)
 
-class TestErrorRoute(BaseRoutesTest):
+    def test_version_get_user(self):
+        """
+        Test GET /version route as user
+        """
+        u = self.user('test', [])
+        self.assertQ('/version', user=u, status=STATUS_OK, schema=self.schema)
+
+class TestErrorRoute(BasicTest):
     """
     Test /error route
     """
-    LOGIN_REQUIRED = False
-    IGNORE_DATABASE_FLUSH = True
-    ROUTINE = '/error'
-    DEFAULT_RETVAL = APIResponses.ERROR
-    POST_RETVAL = APIResponses.ERROR
-    PUT_RETVAL = APIResponses.ERROR
-    DELETE_RETVAL = APIResponses.ERROR
-    IGNORE_TEST = False
+    def test_error_get_anon(self):
+        """
+        Test GET /version route as anonymous
+        """
+        self.assertQ('/error', user=None, status=STATUS_ERROR)
 
-    RESPONSE_SCHEMA = {
-        'type': "object",
-        'properties': {
-            'version': {'type': 'string'},
-        },
-        'required': ['version']
-    }
+    def test_error_get_user(self):
+        """
+        Test GET /version route as user
+        """
+        u = self.user('test', [])
+        self.assertQ('/error', user=u, status=STATUS_ERROR)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
+    import unittest
     unittest.main()
