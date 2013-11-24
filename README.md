@@ -5,11 +5,6 @@ Server
 Server with JSON API for clients.
 
 
-Client
-======
-Simple client library for Renki.
-
-
 License
 =======
 
