@@ -17,8 +17,8 @@ def verify_input(data, fields=[], ignore_unknown=False):
     if not data and len(fields) == 0:
         return {}
     # Remove api key
-    if 'key' in data:
-        del data['key']
+    if 'apikey' in data:
+        del data['apikey']
     keys = []
     for field in fields:
         if field.key not in data:

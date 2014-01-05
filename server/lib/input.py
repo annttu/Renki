@@ -79,8 +79,8 @@ class BaseParser(object):
         out = {}
         iterated = []
         for k, v in data.items():
-            if k == 'key':
-                # Key is always ignored
+            if k == 'apikey':
+                # API Key is always ignored
                 continue
             elif k not in cls.base_validators:
                 raise Invalid('Unknown parameter "%s"' % k)

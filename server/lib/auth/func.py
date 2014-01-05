@@ -72,7 +72,7 @@ def get_apikey(request):
     """
     Get apikey from request
     """
-    key = request.GET.get('key')
+    key = request.GET.get('apikey')
     if not key and request.json:
-        key = request.json.get('key')
+        key = request.json.get('apikey')
     return key

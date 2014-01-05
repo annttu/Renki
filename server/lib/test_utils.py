@@ -195,7 +195,7 @@ class BasicTest(unittest.TestCase):
         args = {'username': user, 'password': password}
         s = self.app.post('/login', params=args, status="*")
         self.assertStatus(s, STATUS_OK)
-        return s.json['key']
+        return s.json['apikey']
 
     def user(self, name, perms=[]):
         """
@@ -229,9 +229,9 @@ class BasicTest(unittest.TestCase):
         returns response object
         """
         if user:
-            args['key'] = user.sessionkey
-        elif 'key' in args:
-            del args['key']
+            args['apikey'] = user.sessionkey
+        elif 'apikey' in args:
+            del args['apikey']
         if method.upper() == 'GET':
             return self.app.get(route, params=args, status="*")
         elif method.upper() == 'POST':
@@ -239,8 +239,8 @@ class BasicTest(unittest.TestCase):
         elif method.upper() == 'PUT':
             return self.app.put_json(route, params=args, status="*")
         elif method.upper() == 'DELETE':
-            if 'key' in args:
-                route = "%s?key=%s" % (route, args['key'])
+            if 'apikey' in args:
+                route = "%s?apikey=%s" % (route, args['apikey'])
             return self.app.delete(route, params=args, status="*")
         self.fail("Method %s not implemented" % method)
 

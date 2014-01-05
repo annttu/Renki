@@ -17,15 +17,15 @@ def login_valid():
     """
     Test if api key is valid
     """
-    key = request.GET.get('key', '')
+    key = request.GET.get('apikey', '')
     if not key and request.json:
-        key = request.json.get('key', '')
+        key = request.json.get('apikey', '')
     if not key:
-        abort(401, "key is mandatory")
+        abort(401, "API key is mandatory")
     for mod in settings.AUTHENTICATION_MODULES:
         if mod.valid_key(key):
-            return ret_ok({'message': 'Key is valid'})
-    return ret_error('Key is not valid')
+            return ret_ok({'message': 'API key is valid'})
+    return ret_error('API key is not valid')
 
 
 @app.post('/login')
@@ -42,7 +42,7 @@ def login_route():
             key = mod.authenticate(username=username, password=password)
             connection.session.safe_commit()
             logger.info("User %s has successfully authenticated" % username)
-            return ret_ok({'key': key})
+            return ret_ok({'apikey': key})
         except AuthenticationFailed:
             pass
     return abort(401, 'Authentication failed')
