@@ -13,13 +13,18 @@ from hashlib import sha512
 Dummy authentication module
 """
 
-dummyAdminGroup = PermissionGroup(name='admin', permissions=['domain_view_all',
-                                  'domain_modify_all', 'vhost_view_all',
-                                  'vhost_modify_all'])
+class UserPermissionGroup(PermissionGroup):
 
-dummyUserGroup = PermissionGroup(name='user', permissions=['domain_view_own',
-                                 'domain_modify_own', 'vhost_view_own',
-                                 'vhost_modify_own'])
+    def has_permission(self, permission):
+        return permission.endswith('_own')
+
+class AdminPermissionGroup(PermissionGroup):
+    def has_permission(self, permission):
+        return permission.endswith('_own') or permission.endswith('_all')
+
+dummyAdminGroup = AdminPermissionGroup(name='admin', permissions=[])
+
+dummyUserGroup = UserPermissionGroup(name='user', permissions=[])
 
 
 class DummyUser(User):

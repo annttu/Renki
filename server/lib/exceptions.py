@@ -17,6 +17,7 @@ class RenkiHTTPError(HTTPError):
     def __init__(self, msg):
         if renki_settings.DEBUG is True:
             traceback.print_stack()
+            print(msg)
         exception = RenkiException(msg)
         super(RenkiHTTPError, self).__init__(status=self.STATUS,
                                              exception=exception)

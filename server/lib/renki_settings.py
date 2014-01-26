@@ -31,7 +31,7 @@ LOGGING = {
         },
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'simple'
+            'formatter': 'verbose'
         }
     },
     'loggers': {
@@ -71,6 +71,16 @@ LOGGING = {
             'level': 'DEBUG',
         },
         'auth.db': {
+            'handlers': ['console'],
+            'propagate': True,
+            'level': 'DEBUG',
+        },
+        'utils': {
+            'handlers': ['console'],
+            'propagate': True,
+            'level': 'DEBUG',
+        },
+        'dns_zone_routes': {
             'handlers': ['console'],
             'propagate': True,
             'level': 'DEBUG',

@@ -21,6 +21,7 @@ from lib.database import connection
 from webtest import TestApp, AppError
 from jsonschema import validate as jsonschema_validate
 from jsonschema.exceptions import ValidationError as JSONValidationError
+import json
 
 import time
 
@@ -35,7 +36,7 @@ logger.setLevel(logging.ERROR)
 # Initialize database connection
 check_settings.set_settings()
 
-logger.setLevel(logging.CRITICAL)
+logger.setLevel(logging.DEBUG)
 connection.initialize_connection(unittest=True)
 
 # TODO:
@@ -43,7 +44,7 @@ connection.initialize_connection(unittest=True)
 
 logging.config.dictConfig({'version': 1,
     'disable_existing_loggers': True})
-settings.DEBUG = False
+settings.DEBUG = True
 
 ### JSON validation ###
 
@@ -91,6 +92,18 @@ class JSONArray(JSONValidatorObject):
 
 class JSONNumber(JSONValidatorObject):
     TYPE = 'number'
+    def __init__(self, *args, minimum=None, maximum=None, **kwargs):
+        super(JSONNumber, self).__init__(*args, **kwargs)
+        self.minimum = minimum
+        self.maximum = maximum
+
+    def args(self):
+        d = {}
+        if self.minimum:
+            d['minimum'] = self.minimum
+        if self.maximum is not None:
+            d['maximum'] = self.maximum
+        return d
 
 class JSONBoolean(JSONValidatorObject):
     TYPE = 'boolean'

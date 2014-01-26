@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-from .exceptions import Invalid
+from .exceptions import Invalid, RenkiHTTPError
 from .enums import JSON_STATUS
 
 import threading
@@ -163,3 +163,16 @@ def thread_local(name):
     def fset(self, value): setattr(_lctx, name, value)
     def fdel(self): delattr(_lctx, name)
     return property(fget, fset, fdel, 'Thread-local property %s' % name)
+
+def sandbox(function, *args, **kwargs):
+    """
+    Run function with arguments *args **kwargs safely inside try execpt.
+    Useful with routes
+    """
+    try:
+        return function(*args, **kwargs)
+    except RenkiHTTPError:
+        raise
+    except Exception as e:
+        logger.exception(e)
+        raise RenkiHTTPError('Unknown error occurred')
