@@ -3,7 +3,7 @@
 
 
 from lib import check_settings
-
+from lib.database import basic_tables
 from lib.database import tables
 from lib.database import connection
 from lib.auth import permissions
