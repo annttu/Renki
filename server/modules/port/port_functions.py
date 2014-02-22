@@ -29,7 +29,7 @@ def get_port_by_id(port_id, user_id=None):
 
     try:
         return query.filter(PortDatabase.id == port_id).one()
-    except NoResultsFound:
+    except NoResultFound:
         pass
 
     return DoesNotExist("Port id=%s does not exist" % port_id)
@@ -43,13 +43,13 @@ def add_user_port(user_id, server_group_id):
     query = ServerGroupDatabase.query()
     try:
         query = query.filter(ServerGroupDatabase.id == server_group_id).one()
-    except DoesNotExists:
+    except NoResultFound:
         raise Invalid('Server group id=%s does not exist' % server_group_id)
 
     try:
         query = dbsession.query(func.max(PortDatabase.port)).filter(PortDatabase.server_group_id == server_group_id).group_by(PortDatabase.server_group_id)
         portNumber = int(query.one()[0]) + 1
-    except Exception as e:
+    except NoResultFound:
         portNumber = 1337
 
     port = PortDatabase()

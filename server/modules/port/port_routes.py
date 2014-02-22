@@ -67,8 +67,8 @@ def ports_add(user):
     params = PortAddValidator.parse(data)
     try:
         port = add_user_port(**params)
-    except (Invalid, DatabaseError) as e:
-        return error(str(e))
+    except Invalid as e:
+        raise
     except RenkiHTTPError:
         raise
     except Exception as e:
@@ -101,7 +101,6 @@ def admin_ports_add(user_id, user):
         raise RenkiHTTPError('Unknown error occured')
     dbconn.session.safe_commit()
     return ok(port.as_dict())
-
 
 @app.delete('/ports/<port_id:int>')
 @app.delete('/ports/<port_id:int>/')
