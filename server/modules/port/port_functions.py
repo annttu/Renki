@@ -7,7 +7,7 @@ from lib.database.filters import do_limits
 from sqlalchemy import func
 from sqlalchemy.orm.exc import NoResultFound
 
-def get_ports(user_id = None, limit = None, offset = None):
+def get_ports(user_id=None, limit=None, offset=None):
     query = PortDatabase.query()
     if user_id is not None:
         if is_positive_numeric(user_id) is not True:
@@ -16,12 +16,12 @@ def get_ports(user_id = None, limit = None, offset = None):
     query = do_limits(query, limit, offset)
     return query.all()
 
-def get_user_ports(user_id, limit = None, offset = None):
+def get_user_ports(user_id, limit=None, offset=None):
     if is_positive_numeric(user_id) is not True:
         raise Invalid('User id must be positive integer')
     return get_ports(user_id = user_id, limit = limit, offset = offset)
 
-def get_port_by_id(port_id, user_id = None):
+def get_port_by_id(port_id, user_id=None):
     query = PortDatabase.query()
 
     if user_id is not None:
@@ -44,7 +44,7 @@ def add_user_port(user_id, server_group_id):
     try:
         query = query.filter(ServerGroupDatabase.id == server_group_id).one()
     except DoesNotExists:
-        raise Invalid('Server group does not exist')
+        raise Invalid('Server group id=%s does not exist' % server_group_id)
 
     try:
         query = dbsession.query(func.max(PortDatabase.port)).filter(PortDatabase.server_group_id == server_group_id).group_by(PortDatabase.server_group_id)

@@ -85,7 +85,7 @@ LOGGING = {
             'propagate': True,
             'level': 'DEBUG',
         },
-        'ports': {
+        'port_routes': {
             'handlers': ['console'],
             'propagate': True,
             'level': 'DEBUG',

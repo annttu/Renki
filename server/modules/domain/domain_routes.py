@@ -188,7 +188,7 @@ def domains_modify_domain(user, domain_id):
 
 @app.post('/<user_id:int>/domains/<domain_id:int>')
 @app.post('/<user_id:int>/domains/<domain_id:int>/')
-@require_perm(permission="domains_modify_own")
+@require_perm(permission="domains_modify_all")
 def domains_modify_domain_admin(user, user_id, domain_id):
     """
     POST /domains/domain_id route
