@@ -49,7 +49,6 @@ def ports_add(user):
     data['user_id'] = user.user_id
     params = PortAddValidator.parse(data)
     try:
-        print("adding port")
         port = add_user_port(**params)
     except (Invalid, DatabaseError) as e:
         return error(str(e))
@@ -68,7 +67,6 @@ def ports_delete(user, port_id):
     """
     DELETE /ports/port_id route
     """
-    print("delete")
     data = {'user_id' : user.id, 'port_id': port_id}
     data = PortIDValidator.parse(data)
     port = get_port_by_id(int(port_id), user_id = int(user.id))
