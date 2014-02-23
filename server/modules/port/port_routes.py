@@ -28,7 +28,7 @@ def ports_index(user):
     params = PortGetValidator.parse(data)
     try:
         ports = get_user_ports(**params)
-    except RenkiHTTPError:
+    except (RenkiHTTPError, Invalid):
         raise
     except Exception as e:
         logger.exception(e)
@@ -45,7 +45,7 @@ def admin_ports_index(user_id, user):
     params = PortGetValidator.parse(data)
     try:
         ports = get_user_ports(**params)
-    except RenkiHTTPError:
+    except (RenkiHTTPError, Invalid, DoesNotExist):
         raise
     except Exception as e:
         logger.exception(e)
@@ -67,9 +67,7 @@ def ports_add(user):
     params = PortAddValidator.parse(data)
     try:
         port = add_user_port(**params)
-    except Invalid as e:
-        raise
-    except RenkiHTTPError:
+    except (RenkiHTTPError, Invalid, DoesNotExist):
         raise
     except Exception as e:
         logger.exception(e)
@@ -92,9 +90,7 @@ def admin_ports_add(user_id, user):
     params = PortAddValidator.parse(data)
     try:
         port = add_user_port(**params)
-    except (Invalid, DatabaseError) as e:
-        raise
-    except RenkiHTTPError:
+    except (Invalid, DatabaseError, RenkiHTTPError, DoesNotExist):
         raise
     except Exception as e:
         logger.exception(e)

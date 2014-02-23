@@ -149,10 +149,11 @@ class STATUS_NOTFOUND(ResponseStatus):
     JSON_STATUS = JSON_STATUS.NOTFOUND
 
 class TestUser(object):
-    def __init__(self, name, password, sessionkey):
+    def __init__(self, name, password, sessionkey, user):
         self.name = name
         self.sessionkey = sessionkey
         self.password = password
+        self.user = user
 
 class BasicTest(unittest.TestCase):
 
@@ -231,7 +232,7 @@ class BasicTest(unittest.TestCase):
                 user.permissions.append(perm)
             connection.session.commit()
             sessionkey = self.auth(user=name, password=pw)
-            u = TestUser(name=name, password=pw, sessionkey=sessionkey)
+            u = TestUser(name=name, password=pw, sessionkey=sessionkey, user=user)
             self._users[name] = u
         return self._users[name]
 
@@ -256,6 +257,24 @@ class BasicTest(unittest.TestCase):
                 route = "%s?apikey=%s" % (route, args['apikey'])
             return self.app.delete(route, params=args, status="*")
         self.fail("Method %s not implemented" % method)
+
+    def assertContainsOne(self, database, cls = None):
+        query = database.query()
+        if cls is not None:
+            query = query.filter(cls)
+        self.assertEqual(query.count(), 1)
+
+    def assertContainsMany(self, database, cls = None):
+        query = database.query()
+        if cls is not None:
+            query = query.filter(cls)
+        self.assertTrue(query.count() > 1)
+
+    def assertContainsNone(self, database, cls = None):
+        query = database.query()
+        if cls is not None:
+            query = query.filter(cls)
+        self.assertEqual(query.count(), 0)
 
     def assertStatus(self, response, status):
         """
