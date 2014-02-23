@@ -93,7 +93,7 @@ def admin_ports_add(user_id, user):
     try:
         port = add_user_port(**params)
     except (Invalid, DatabaseError) as e:
-        return error(str(e))
+        raise
     except RenkiHTTPError:
         raise
     except Exception as e:
@@ -111,7 +111,10 @@ def ports_delete(user, port_id):
     """
     data = {'user_id' : user.id, 'port_id': port_id}
     data = PortIDValidator.parse(data)
-    port = get_port_by_id(int(port_id), user_id = int(user.id))
+    try:
+        port = get_port_by_id(int(port_id), user_id = int(user.id))
+    except DoesNotExist:
+        raise
     port.delete()
     dbconn.session.safe_commit()
     return ok({})
@@ -125,7 +128,10 @@ def admin_ports_delete(user, user_id, port_id):
     """
     data = {'user_id' : user.id, 'port_id': port_id}
     data = PortIDValidator.parse(data)
-    port = get_port_by_id(int(port_id), user_id = int(user_id))
+    try:
+        port = get_port_by_id(int(port_id), user_id = int(user_id))
+    except DoesNotExist:
+        raise
     port.delete()
     dbconn.session.safe_commit()
     return ok({})

@@ -32,7 +32,7 @@ def get_port_by_id(port_id, user_id=None):
     except NoResultFound:
         pass
 
-    return DoesNotExist("Port id=%s does not exist" % port_id)
+    raise DoesNotExist("Port id=%s does not exist" % port_id)
 
 def add_user_port(user_id, server_group_id):
     if is_positive_numeric(user_id) is not True:
