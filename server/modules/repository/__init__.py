@@ -1,4 +1,4 @@
 # Import here to routes and database tables registered
 
-from .routes import *
-from .database import *
+from .repository_routes import *
+from .repository_database import *
