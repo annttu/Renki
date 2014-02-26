@@ -4,8 +4,10 @@
 
 from lib import check_settings
 from lib.database import basic_tables
+from lib.database.basic_tables import ServiceDatabase, ServerGroupDatabase
 from lib.database import tables
 from lib.database import connection
+from lib.database.connection import session as dbsession
 from lib.auth import permissions
 #from lib.database.connection import DBConnection
 # Import modules to get all tables registered
@@ -77,6 +79,35 @@ def setup_development_users():
     test.save()
     admin.save()
 
+def setup_development_servers():
+    """
+    Add lakka and hilla servers and create service for them
+    """
+    if not ServiceDatabase.query().filter(ServiceDatabase.name == 'TestService').all():
+        service = ServiceDatabase()
+        service.name = 'TestService'
+        service.save()
+        dbsession.commit()
+    else:
+        service = ServiceDatabase.query().filter(ServiceDatabase.name == 'TestService').one()
+
+    if not ServerGroupDatabase.query().filter(ServerGroupDatabase.name == 'Lakka').all():
+        lakka = ServerGroupDatabase()
+        lakka.name = "Lakka"
+        lakka.service = service.id
+        lakka.save()
+        dbsession.commit()
+    else:
+        lakka = ServerGroupDatabase.query().filter(ServerGroupDatabase.name == 'Lakka').one()
+
+    if not ServerGroupDatabase.query().filter(ServerGroupDatabase.name == 'Hilla').all():
+        hilla = ServerGroupDatabase()
+        hilla.name = "Hilla"
+        hilla.service = service.id
+        hilla.save()
+        dbsession.commit()
+    else:
+        hilla = ServerGroupDatabase.query().filter(ServerGroupDatabase.name == 'Hilla').one()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Admin util for renkiserver')
@@ -100,6 +131,7 @@ if __name__ == '__main__':
     elif args.development_setup is True:
         init()
         setup_development_users()
+        setup_development_servers()
     else:
         parser.print_help()
         sys.exit(1)
