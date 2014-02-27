@@ -22,10 +22,10 @@ class RepositoryDatabase(RenkiBase, RenkiUserDataTable):
             raise Invalid('Repository name too long')
         return True
 
-    def save(self):
-        super(RepositoryDatabase, self).save()
-        self._conn.add(self)
-        self._conn.commit()
+#    def save(self):
+#        super(RepositoryDatabase, self).save()
+#        self._conn.add(self)
+#        self._conn.commit()
 
 # Register table
 register_table(RepositoryDatabase)

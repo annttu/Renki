@@ -65,6 +65,7 @@ def repository_add(user):
     except (RenkiHTTPError, Invalid, DoesNotExist):
         raise
     except Exception as e:
+        print(e)
         logger.exception(e)
         raise RenkiHTTPError('Unknown error occured')
     dbconn.session.safe_commit()
