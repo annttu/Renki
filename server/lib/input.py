@@ -231,6 +231,7 @@ class ListValueValidator(Validator):
     def check(self, value):
         if value not in self.allowed_values:
             raise Invalid("%s value '%s' is not allowed" % (self.name, value))
+        return value
 
 
 
