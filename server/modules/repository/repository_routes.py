@@ -34,7 +34,6 @@ def repositories_index(user):
         raise RenkiHTTPError('Unknown error occurred')
     return ok({'svn': [x.as_dict() for x in repos if x.type == 'svn'], 'git': [x.as_dict() for x in repos if x.type == 'git']})
 
-
 @app.get('/repositories/<type>/<repo_id:int>')
 @app.get('/repositories/<type>/<repo_id:int>/')
 @require_perm(permission = 'repositories_view_own')
