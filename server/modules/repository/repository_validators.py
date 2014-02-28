@@ -12,8 +12,9 @@ class RepositoryAddValidator(InputParser):
     user_id = UserIDValidator('user_id')
     server_group_id = IntegerValidator('server_group_id', positive = True, required = True)
     name = StringValidator('name', required = True)
-    repo_type = ListValueValidator('repo_type', allowed_values=['svn', 'git'], required = True)
+    type = ListValueValidator('type', allowed_values=['svn', 'git'], required = True)
 
 class RepositoryIDValidator(InputParser):
     user_id = UserIDValidator('user_id')
-    port_id = IntegerValidator('port_id', positive = True, required = True)
+    repo_id = IntegerValidator('repo_id', positive = True, required = True)
+    type = ListValueValidator('type', allowed_values=['svn', 'git'], required = True)

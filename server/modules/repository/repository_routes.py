@@ -5,13 +5,11 @@ from bottle import request, response, abort
 from lib.auth.func import authenticated
 from lib.auth.func import require_perm
 from lib.database import connection as dbconn
-from lib.exceptions import AlreadyExist, DatabaseError, RenkiHTTPError, DoesNotExist, Invalid
+from lib.exceptions import AlreadyExist, RenkiHTTPError, DoesNotExist, Invalid
 from lib.renki import app
 from lib.utils import ok, error
-from .repository_validators import RepositoryGetValidator, RepositoryAddValidator
-from .repository_functions import get_user_repositories, add_user_repository
-from collections import defaultdict
-
+from .repository_validators import RepositoryGetValidator, RepositoryAddValidator, RepositoryIDValidator
+from .repository_functions import get_user_repositories, add_user_repository, get_repository_by_id
 import logging
 
 logger = logging.getLogger('repository_routes')
@@ -32,50 +30,69 @@ def repositories_index(user):
     except (RenkiHTTPError, Invalid):
         raise
     except Exception as e:
-        print(e)
+        logger.exception(e)
+        raise RenkiHTTPError('Unknown error occurred')
+    return ok({'svn': [x.as_dict() for x in repos if x.type == 'svn'], 'git': [x.as_dict() for x in repos if x.type == 'git']})
+
+
+@app.get('/repositories/<type>/<repo_id:int>')
+@app.get('/repositories/<type>/<repo_id:int>/')
+@require_perm(permission = 'repositories_view_own')
+def repositories_get_repository(user, type, repo_id):
+    """
+    GET /repositories/<type>/<id>
+    """
+    data = dict(request.params.items())
+    data.update({'user_id': user.user_id, 'type': type, 'repo_id': repo_id})
+    params = RepositoryIDValidator.parse(data)
+    try:
+        repo = get_repository_by_id(**params)
+    except DoesNotExist:
+        raise
+    except Exception as e:
         logger.exception(e)
         raise RenkiHTTPError('Unknown error occurred')
 
-    return ok({'svn': [x.as_dict() for x in repos if x.repo_type == 'svn'], 'git': [x.as_dict() for x in repos if x.repo_type == 'git']})
+    return ok(repo.as_dict())
 
-@app.get('/repositories/svn')
-@app.get('/repositories/svn/')
-@require_perm(permission = 'repositories_view_own')
-def repositories_svn(user):
-    """
-    GET /repositories/svn
-    """
-    return
-
-@app.post('/repositories')
-@app.post('/repositories/')
+@app.post('/repositories/<type>')
+@app.post('/repositories/<type>/')
 @require_perm(permission = 'repositories_modify_own')
-def repository_add(user):
+def repositories_add_repository(user, type):
     """
-    POST /repositories/svn
+    POST /repositories/<type>
     """
-    data = request.json
-    if not data:
-        data = dict(request.params.items())
+    data = dict(request.params.items())
     data['user_id'] = user.user_id
+    data['type'] = type
     params = RepositoryAddValidator.parse(data)
-
     try:
         repo = add_user_repository(**params)
-    except (RenkiHTTPError, Invalid, DoesNotExist):
+    except (DoesNotExist, AlreadyExist):
         raise
     except Exception as e:
-        print(e)
         logger.exception(e)
-        raise RenkiHTTPError('Unknown error occured')
+        raise RenkiHTTPError('Unknown error occurred')
     dbconn.session.safe_commit()
     return ok(repo.as_dict())
 
-@app.get('/<user_id:int>/repositories')
-@app.get('/<user_id:int>/repositories/')
-@require_perm(permission = 'repositories_view_all')
-def repositories_admin_index(user_id, user):
+@app.delete('/repositories/<type>/<repo_id:int>')
+@app.delete('/repositories/<type>/<repo_id:int>/')
+@require_perm(permission = 'repositories_modify_own')
+def repositories_delete_repository(user, type, repo_id):
     """
-    GET /<user_id:int>/repositories
+    DELETE /repositories/<type>/<id>
     """
-    return
+    data = dict(request.params.items())
+    data.update({'user_id': user.user_id, 'type': type, 'repo_id': repo_id})
+    params = RepositoryIDValidator.parse(data)
+    try:
+        repo = get_repository_by_id(**params)
+    except DoesNotExist:
+        raise
+    except Exception as e:
+        logger.exception(e)
+        raise RenkiHTTPError('Unknown error occurred')
+    repo.delete()
+    dbconn.session.safe_commit()
+    return ok()
