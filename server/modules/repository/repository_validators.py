@@ -4,7 +4,6 @@ from lib.input import UserIDValidator, InputParser, IntegerValidator, ListValueV
 
 class RepositoryGetValidator(InputParser):
     user_id = UserIDValidator('user_id')
-    repo_type = ListValueValidator('repo_type', allowed_values=['svn', 'git'], required = False)
     limit = IntegerValidator('limit', positive = True, required = False)
     offset = IntegerValidator('offset', positive = True, required = False)
 

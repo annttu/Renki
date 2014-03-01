@@ -2,6 +2,7 @@ from lib import test_utils as tu
 from lib.database.basic_tables import *
 from modules.repository.repository_database import *
 from modules.repository.repository_functions import *
+from modules.repository.repository_validators import *
 from lib.database.connection import session as dbsession
 import unittest
 
@@ -111,6 +112,33 @@ class TestRepositoriesRoutine(tu.BasicTest):
         self.assertContainsOne(RepositoryDatabase, RepositoryDatabase.id == r.id)
         self.assertQ('/repositories/%s/%d' % (r.type, r.id), user=u, method='DELETE', status=tu.STATUS_OK)
         self.assertContainsNone(RepositoryDatabase, RepositoryDatabase.id == r.id)
+
+    """
+    VALIDATORS
+    """
+    def test_get_validator(self):
+        params = RepositoryGetValidator.parse({'user_id': 1})
+        with self.assertRaises(Invalid):
+            params = RepositoryGetValidator.parse({'user_id': -2})
+        with self.assertRaises(Invalid):
+            params = RepositoryGetValidator.parse({})
+
+    def test_add_validator(self):
+        params = RepositoryAddValidator.parse({'user_id': 1, 'server_group_id': 1, 'name': 'testRepository', 'type': 'svn'})
+        params = RepositoryAddValidator.parse({'user_id': 1, 'server_group_id': 1, 'name': 'testRepository', 'type': 'git'})
+
+        with self.assertRaises(Invalid):
+            params = RepositoryAddValidator.parse({'user_id': 1, 'server_group_id': 1, 'name': 'testRepository', 'type': 'spudro'})
+        with self.assertRaises(Invalid):
+            params = RepositoryAddValidator.parse({'user_id': 1, 'server_group_id': 1, 'name': 'testRepository'})
+        with self.assertRaises(Invalid):
+            params = RepositoryAddValidator.parse({'user_id': 1, 'name': 'testRepository', 'type': 'svn'})
+        with self.assertRaises(Invalid):
+            params = RepositoryAddValidator.parse({'user_id': 1, 'server_group_id': 1, 'type': 'svn'})
+        with self.assertRaises(Invalid):
+            params = RepositoryAddValidator.parse({'server_group_id': 1, 'name': 'testRepository', 'type': 'svn'})
+        with self.assertRaises(Invalid):
+            params = RepositoryAddValidator.parse({'user_id': 1, 'server_group_id': 1, 'name': 'testRepository'})
 
 if __name__ == "__main__":
     import unittest
