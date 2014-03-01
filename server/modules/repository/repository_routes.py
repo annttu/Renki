@@ -61,7 +61,9 @@ def repositories_add_repository(user, type):
     """
     POST /repositories/<type>
     """
-    data = dict(request.params.items())
+    data = request.json
+    if not data:
+        data = dict(request.params.items())
     data['user_id'] = user.user_id
     data['type'] = type
     params = RepositoryAddValidator.parse(data)
@@ -82,7 +84,9 @@ def repositories_delete_repository(user, type, repo_id):
     """
     DELETE /repositories/<type>/<id>
     """
-    data = dict(request.params.items())
+    data = request.json
+    if not data:
+        data = dict(request.params.items())
     data.update({'user_id': user.user_id, 'type': type, 'repo_id': repo_id})
     params = RepositoryIDValidator.parse(data)
     try:
