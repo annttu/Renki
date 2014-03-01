@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-from bottle import request, response, abort
-from lib.auth.func import authenticated
+from bottle import request
 from lib.auth.func import require_perm
 from lib.database import connection as dbconn
-from lib.exceptions import AlreadyExist, DatabaseError, RenkiHTTPError, DoesNotExist, Invalid
+from lib.exceptions import DatabaseError, RenkiHTTPError, DoesNotExist, Invalid
 from lib.renki import app
 from lib.utils import ok, error
 from .port_functions import get_user_ports, add_user_port, get_port_by_id
@@ -21,10 +20,8 @@ def ports_index(user):
     """
     GET /ports
     """
-    ports = []
-    
     data = dict(request.params.items())
-    data['user_id'] = user.user_id
+    data.update({'user_id': user.user_id})
     params = PortGetValidator.parse(data)
     try:
         ports = get_user_ports(**params)
@@ -38,10 +35,12 @@ def ports_index(user):
 @app.get('/<user_id:int>/ports')
 @app.get('/<user_id:int>/ports/')
 @require_perm(permission='ports_view_all')
-def admin_ports_index(user_id, user):
-    ports = []
+def admin_ports_index(user, user_id):
+    """
+    GET /<id>/ports
+    """
     data = dict(request.params.items())
-    data['user_id'] = user_id
+    data.update({'user_id': user_id})
     params = PortGetValidator.parse(data)
     try:
         ports = get_user_ports(**params)
@@ -59,11 +58,10 @@ def ports_add(user):
     """
     POST /ports
     """
-    
     data = request.json
     if not data:
         data = dict(request.params.items())
-    data['user_id'] = user.user_id
+    data.update({'user_id': user.user_id})
     params = PortAddValidator.parse(data)
     try:
         port = add_user_port(**params)
@@ -78,15 +76,14 @@ def ports_add(user):
 @app.post('/<user_id:int>/ports')
 @app.post('/<user_id:int>/ports/')
 @require_perm(permission="ports_add_all")
-def admin_ports_add(user_id, user):
+def admin_ports_add(user, user_id):
     """
-    POST /ports
+    POST /<user_id>/ports
     """
-    
     data = request.json
     if not data:
         data = dict(request.params.items())
-    data['user_id'] = user_id
+    data.update({'user_id': user_id})
     params = PortAddValidator.parse(data)
     try:
         port = add_user_port(**params)
@@ -105,10 +102,13 @@ def ports_delete(user, port_id):
     """
     DELETE /ports/port_id route
     """
-    data = {'user_id' : user.id, 'port_id': port_id}
-    data = PortIDValidator.parse(data)
+    data = request.json
+    if not data:
+        data = dict(request.params.items())
+    data.update({'user_id' : user.id, 'port_id': port_id})
+    params = PortIDValidator.parse(data)
     try:
-        port = get_port_by_id(int(port_id), user_id = int(user.id))
+        port = get_port_by_id(**params)
     except DoesNotExist:
         raise
     port.delete()
@@ -122,13 +122,15 @@ def admin_ports_delete(user, user_id, port_id):
     """
     DELETE /ports/port_id route
     """
-    data = {'user_id' : user.id, 'port_id': port_id}
-    data = PortIDValidator.parse(data)
+    data = request.json
+    if not data:
+        data = dict(request.params.items())
+    data.update({'user_id' : user_id, 'port_id': port_id})
+    params = PortIDValidator.parse(data)
     try:
-        port = get_port_by_id(int(port_id), user_id = int(user_id))
+        port = get_port_by_id(**params)
     except DoesNotExist:
         raise
     port.delete()
     dbconn.session.safe_commit()
     return ok({})
-
