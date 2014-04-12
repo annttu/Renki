@@ -10,7 +10,6 @@ from lib.validators import validate_user_id, validate_domain
 from sqlalchemy import Column, String, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 
-
 class DomainDatabase(RenkiBase, RenkiUserDataTable):
     __tablename__ = 'domain'
     name = Column('name', String(1024), nullable=False)

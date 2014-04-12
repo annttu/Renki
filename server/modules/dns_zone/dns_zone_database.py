@@ -12,6 +12,20 @@ from sqlalchemy import Column, String, Boolean, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 from lib.database.tables import register_table
 
+class DNSRecordDatabase(RenkiBase, RenkiUserDataTable):
+    __tablename__ = 'dns_record'
+
+    dns_zone_id = Column('dns_zone_id', Integer, ForeignKey('dns_zone.id'))
+
+    key = Column('key', String, nullable=False)
+    type = Column('type', String, nullable=False)
+    ttl = Column('ttl', Integer, nullable=True, default=lambda: settings.DNS_ZONE_RECORD_TTL)
+    value = Column('value', String, nullable=False)
+    priority = Column('priority', Integer, nullable=True, default=None)
+
+    def validate(self):
+        # TODO: add validators
+        pass
 
 class DNSZoneDatabase(RenkiBase, RenkiUserDataTable):
     __tablename__ = 'dns_zone'
@@ -41,22 +55,6 @@ class DNSZoneDatabase(RenkiBase, RenkiUserDataTable):
     def validate(self):
         # TODO: add validators
         pass
-
-class DNSRecordDatabase(RenkiBase, RenkiUserDataTable):
-    __tablename__ = 'dns_record'
-
-    dns_zone_id = Column('dns_zone_id', Integer, ForeignKey('dns_zone.id'))
-
-    key = Column('key', String, nullable=False)
-    type = Column('type', String, nullable=False)
-    ttl = Column('ttl', Integer, nullable=True, default=lambda: settings.DNS_ZONE_RECORD_TTL)
-    value = Column('value', String, nullable=False)
-    priority = Column('priority', Integer, nullable=True, default=None)
-
-    def validate(self):
-        # TODO: add validators
-        pass
-
 
 # Register tables
 register_table(DNSZoneDatabase)

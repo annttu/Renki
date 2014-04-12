@@ -1,6 +1,5 @@
 # encoding: utf-8
 
-
 from lib.database.table import RenkiUserDataTable, RenkiBase
 from lib.database.tables import register_table
 from lib.exceptions import Invalid
