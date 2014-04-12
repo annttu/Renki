@@ -18,13 +18,13 @@ class TestPortsRoutine(tu.BasicTest):
 
         self.sg = ServerGroupDatabase()
         self.sg.name = "Lakka"
-        self.sg.service = service.id
+        self.sg.service = service #.id
         self.sg.save()
         dbsession.commit()
 
         self.sg2 = ServerGroupDatabase()
         self.sg2.name = "Hilla"
-        self.sg2.service = service.id
+        self.sg2.service = service #.id
         self.sg2.save()
         dbsession.commit()
 

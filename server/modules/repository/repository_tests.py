@@ -19,13 +19,13 @@ class TestRepositoriesRoutine(tu.BasicTest):
 
         self.sg = ServerGroupDatabase()
         self.sg.name = "Lakka"
-        self.sg.service = service.id
+        self.sg.service = service
         self.sg.save()
         dbsession.commit()
 
         self.sg2 = ServerGroupDatabase()
         self.sg2.name = "Hilla"
-        self.sg2.service = service.id
+        self.sg2.service = service
         self.sg2.save()
         dbsession.commit()
     def create_repository(self, user, name, type, sgid = None):

@@ -6,7 +6,7 @@ from lib.database.tables import metadata
 from lib.history_meta import Versioned
 from sqlalchemy.ext.declarative import declarative_base
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime
@@ -93,12 +93,12 @@ class RenkiDataTable(RenkiTable):
 class RenkiUserDataTable(RenkiDataTable, Versioned):
     # Every user data table contains waiting column
     waiting = Column("waiting", Boolean, nullable=False, default=False)
+    ticketgroup = ForeignKey("TicketGroup", backref="ticket_group")
 
 
 # RenkiUserTable contains userid
 class RenkiUserTable(RenkiDataTable):
     user_id = Column('user_id', Integer, nullable=False)
-
 
 
 RenkiBase = declarative_base(cls=RenkiTable, metadata=metadata)

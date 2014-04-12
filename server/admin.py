@@ -39,6 +39,17 @@ def create_tables():
     connection.conn.create_tables()
     logger.info("All tables created")
 
+def drop_tables():
+    """
+    Create database tables
+    """
+    check_settings.set_settings()
+    connection.initialize_connection(echo=DEBUG)
+    logger.info("Dropping tables")
+    for table in tables.TABLES:
+        logger.info("Table: %s" % table.__tablename__)
+    connection.conn.drop_tables()
+    logger.info("All tables dropped")
 
 def create_permissions():
     for permission in permissions.PERMISSIONS:
@@ -94,7 +105,7 @@ def setup_development_servers():
     if not ServerGroupDatabase.query().filter(ServerGroupDatabase.name == 'Lakka').all():
         lakka = ServerGroupDatabase()
         lakka.name = "Lakka"
-        lakka.service = service.id
+        lakka.service = service
         lakka.save()
         dbsession.commit()
     else:
@@ -103,7 +114,7 @@ def setup_development_servers():
     if not ServerGroupDatabase.query().filter(ServerGroupDatabase.name == 'Hilla').all():
         hilla = ServerGroupDatabase()
         hilla.name = "Hilla"
-        hilla.service = service.id
+        hilla.service = service
         hilla.save()
         dbsession.commit()
     else:
@@ -115,8 +126,11 @@ if __name__ == '__main__':
                         action="store_true", default=False)
     parser.add_argument('--development-setup', help="Setup dummy users",
                         action="store_true", default=False)
+    parser.add_argument('--drop_tables', help="Drop tables",
+                        action="store_true", default=False)
     parser.add_argument('-d', '--debug', help="Debug", action="store_true",
                         default=False)
+
     args = parser.parse_args()
     if args.debug is True:
         DEBUG = True
@@ -132,6 +146,9 @@ if __name__ == '__main__':
         init()
         setup_development_users()
         setup_development_servers()
+    elif args.drop_tables is True:
+        init()
+        drop_tables()
     else:
         parser.print_help()
         sys.exit(1)
