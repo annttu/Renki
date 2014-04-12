@@ -8,9 +8,9 @@ from lib.database import connection as dbconn
 from lib.exceptions import AlreadyExist, RenkiHTTPError, DoesNotExist, Invalid
 from lib.renki import app
 from lib.utils import ok, error
-import logging
 
-logger = logging.getLogger('database_routes')
+import logging
+logger = logging.getLogger('database')
 
 @app.get('/databases')
 @app.get('/databases/')

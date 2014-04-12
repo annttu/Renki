@@ -16,9 +16,9 @@ from .dns_zone_functions import get_dns_zone, add_user_dns_zone, \
     get_dns_records, add_dns_record, delete_dns_record, get_dns_record, \
     modify_dns_record, delete_dns_zone
 from lib.exceptions import RenkiHTTPError
-import logging
 
-logger = logging.getLogger('dns_zone_routes')
+import logging
+logger = logging.getLogger('database')
 
 
 def get_dns_route(user_id, domain_id):

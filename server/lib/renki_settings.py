@@ -60,11 +60,6 @@ LOGGING = {
             'propagate': True,
             'level': 'DEBUG',
         },
-        'database/routes': {
-            'handlers': ['console'],
-            'propagate': True,
-            'level': 'DEBUG',
-        },
         'BasicAuthentication': {
             'handlers': ['console'],
             'propagate': True,
@@ -80,13 +75,28 @@ LOGGING = {
             'propagate': True,
             'level': 'DEBUG',
         },
-        'dns_zone_routes': {
+        'database': {
+            'handlers' : ['console'],
+            'propagate': True,
+            'level': 'DEBUG',
+        },
+        'dns_zone': {
             'handlers': ['console'],
             'propagate': True,
             'level': 'DEBUG',
         },
-        'port_routes': {
+        'domain': {
+            'handlers' : ['console'],
+            'propagate': True,
+            'level': 'DEBUG',
+        },
+        'port': {
             'handlers': ['console'],
+            'propagate': True,
+            'level': 'DEBUG',
+        },
+        'repository': {
+            'handlers' : ['console'],
             'propagate': True,
             'level': 'DEBUG',
         }

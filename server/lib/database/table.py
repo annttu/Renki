@@ -12,7 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime
 
 import logging
-logger = logging.getLogger('modules.repository')
+logger = logging.getLogger('dbconnection')
 
 
 class RenkiTable(object):

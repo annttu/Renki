@@ -15,9 +15,9 @@ from .domain_validators import DomainGetValidator, UserDomainPutValidator, \
     DomainIDValidator, DomainEditValidator
 from lib.exceptions import AlreadyExist, DatabaseError, RenkiHTTPError, \
     DoesNotExist
-import logging
 
-logger = logging.getLogger('domain_routes')
+import logging
+logger = logging.getLogger('database')
 
 
 @app.get('/domains/')

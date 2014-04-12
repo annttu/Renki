@@ -10,9 +10,9 @@ from lib.renki import app
 from lib.utils import ok, error
 from .repository_validators import RepositoryGetValidator, RepositoryAddValidator, RepositoryIDValidator
 from .repository_functions import get_user_repositories, add_user_repository, get_repository_by_id
-import logging
 
-logger = logging.getLogger('repository_routes')
+import logging
+logger = logging.getLogger('repository')
 
 @app.get('/repositories')
 @app.get('/repositories/')

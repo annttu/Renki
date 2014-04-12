@@ -9,9 +9,9 @@ from lib.renki import app
 from lib.utils import ok, error
 from .port_functions import get_user_ports, add_user_port, get_port_by_id
 from .port_validators import PortGetValidator, PortAddValidator, PortIDValidator
-import logging
 
-logger = logging.getLogger('port_routes')
+import logging
+logger = logging.getLogger('port')
 
 @app.get('/ports')
 @app.get('/ports/')
