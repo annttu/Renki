@@ -3,7 +3,6 @@
 from lib.exceptions import Invalid, DoesNotExist, DatabaseError
 from lib.database.connection import session as dbsession
 from lib.database.tables import metadata
-from lib.history_meta import Versioned
 from sqlalchemy.ext.declarative import declarative_base
 
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
@@ -88,13 +87,6 @@ class RenkiDataTable(RenkiTable):
     deleted = Column("deleted", Integer, nullable=True, default=None)
     timestamp =   Column("timestamp", DateTime, nullable=False,
                          default=datetime.now)
-
-
-class RenkiUserDataTable(RenkiDataTable, Versioned):
-    # Every user data table contains waiting column
-    waiting = Column("waiting", Boolean, nullable=False, default=False)
-    ticketgroup = ForeignKey("TicketGroup", backref="ticket_group")
-
 
 # RenkiUserTable contains userid
 class RenkiUserTable(RenkiDataTable):

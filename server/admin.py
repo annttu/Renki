@@ -97,7 +97,6 @@ def setup_development_servers():
         hilla = ServerDatabase()
         hilla.name = 'Hilla'
         hilla.save()
-        dbsession.commit()
     else:
         hilla = ServerDatabase.query().filter(ServerDatabase.name == 'Hilla').one()
 
@@ -105,7 +104,6 @@ def setup_development_servers():
         lakka = ServerDatabase()
         lakka.name = 'Lakka'
         lakka.save()
-        dbsession.commit()
     else:
         lakka = ServerDatabase.query().filter(ServerDatabase.name == 'Lakka').one()
 
@@ -113,7 +111,6 @@ def setup_development_servers():
         db1 = ServerDatabase()
         db1.name = 'db1'
         db1.save()
-        dbsession.commit()
     else:
         db1 = ServerDatabase.query().filter(ServerDatabase.name == 'db1').one()
 
@@ -121,7 +118,6 @@ def setup_development_servers():
         db2 = ServerDatabase()
         db2.name = 'db2'
         db2.save()
-        dbsession.commit()
     else:
         db2 = ServerDatabase.query().filter(ServerDatabase.name == 'db2').one()
 
@@ -130,7 +126,6 @@ def setup_development_servers():
         hilla_ports.name = 'Hilla_ports'
         hilla_ports.type = 'port'
         hilla_ports.save()
-        dbsession.commit()
     else:
         hilla_ports = ServiceGroupDatabase.query().filter(ServiceGroupDatabase.name == 'Hilla_ports').one()
 
@@ -139,7 +134,6 @@ def setup_development_servers():
         lakka_ports.name = 'Lakka_ports'
         lakka_ports.type = 'port'
         lakka_ports.save()
-        dbsession.commit()
     else:
         lakka_ports = ServiceGroupDatabase.query().filter(ServiceGroupDatabase.name == 'Lakka_ports').one()
 
@@ -148,7 +142,6 @@ def setup_development_servers():
         mysql_databases.name = 'Mysql_databases'
         mysql_databases.type = 'mysql_database'
         mysql_databases.save()
-        dbsession.commit()
     else:
         mysql_databases = ServiceGroupDatabase.query().filter(ServiceGroupDatabase.name == 'Mysql_databases').one()
 
@@ -157,9 +150,10 @@ def setup_development_servers():
         psql_databases.name = 'Psql_databases'
         psql_databases.type = 'Psql_database'
         psql_databases.save()
-        dbsession.commit()
     else:
         psql_databases = ServiceGroupDatabase.query().filter(ServiceGroupDatabase.name == 'Psql_databases').one()
+
+    dbsession.flush()
 
     if not ServiceDatabase.query().filter(ServiceDatabase.name == 'Mysql_database').all():
         mysql_database = ServiceDatabase()
@@ -167,7 +161,6 @@ def setup_development_servers():
         mysql_database.service_group = mysql_databases
         mysql_database.server = hilla
         mysql_database.save()
-        dbsession.commit()
     else:
         mysql_database = ServiceDatabase.query().filter(ServiceDatabase.name == 'Mysql_database').one()
 
@@ -177,7 +170,6 @@ def setup_development_servers():
         psql_database.service_group = psql_databases
         psql_database.server = hilla
         psql_database.save()
-        dbsession.commit()
     else:
         psql_database = ServiceDatabase.query().filter(ServiceDatabase.name == 'Psql_database').one()
 
@@ -187,7 +179,6 @@ def setup_development_servers():
         hilla_port.service_group = hilla_ports
         hilla_port.server = hilla
         hilla_port.save()
-        dbsession.commit()
     else:
         hilla_port = ServiceDatabase.query().filter(ServiceDatabase.name == 'Hilla_port').one()
 
@@ -197,9 +188,9 @@ def setup_development_servers():
         lakka_port.service_group = lakka_ports
         lakka_port.server = hilla
         lakka_port.save()
-        dbsession.commit()
     else:
         lakka_port = ServiceDatabase.query().filter(ServiceDatabase.name == 'Lakka_port').one()
+    dbsession.commit()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Admin util for renkiserver')
@@ -207,7 +198,7 @@ if __name__ == '__main__':
                         action="store_true", default=False)
     parser.add_argument('--development-setup', help="Setup dummy users",
                         action="store_true", default=False)
-    parser.add_argument('--drop_tables', help="Drop tables",
+    parser.add_argument('--drop-tables', help="Drop tables",
                         action="store_true", default=False)
     parser.add_argument('-d', '--debug', help="Debug", action="store_true",
                         default=False)

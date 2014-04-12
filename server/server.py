@@ -3,7 +3,8 @@
 
 from lib import check_settings
 from lib import renki, renki_settings as settings
-from lib.database.connection import initialize_connection
+from lib.database.connection import initialize_connection, session
+from lib.history_meta import versioned_session
 
 # Importing routes and modules registers also tables
 import lib.auth.db
@@ -19,6 +20,7 @@ if __name__ == '__main__':
     # Run server
     logger.info("Starting server")
     initialize_connection()
+    versioned_session(session.session())
     run(renki.app, host=settings.BIND_HOST, port=settings.BIND_PORT,
         debug=settings.DEBUG, reloader=True)
     logger.info("Server stopped")

@@ -1,6 +1,7 @@
 # encoding: utf-8
 
-from lib.database.table import RenkiUserDataTable, RenkiBase
+from lib.database.user_data_table import RenkiUserDataTable
+from lib.database.table import RenkiBase
 from lib.database.tables import register_table
 from lib.exceptions import Invalid
 from sqlalchemy import Column, String, Integer, types, ForeignKey, UniqueConstraint

@@ -9,7 +9,6 @@ from lib.renki import app
 from lib.utils import ok, error
 from .port_functions import get_user_ports, add_user_port, get_port_by_id
 from .port_validators import PortGetValidator, PortAddValidator, PortIDValidator
-from lib.ticket.ticket import *
 
 import logging
 logger = logging.getLogger('port')
@@ -72,7 +71,6 @@ def ports_add(user):
         logger.exception(e)
         raise RenkiHTTPError('Unknown error occured')
     dbconn.session.safe_commit()
-    create_ticket()
     return ok(port.as_dict())
 
 @app.post('/<user_id:int>/ports')

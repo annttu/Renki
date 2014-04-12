@@ -7,7 +7,6 @@ This file is part of Renki project
 from lib.database.tables import TABLES, metadata
 from lib.exceptions import DatabaseError
 from lib import renki_settings as settings, renki
-from lib.history_meta import versioned_session
 from lib.utils import thread_local
 
 from sqlalchemy import create_engine
@@ -76,7 +75,6 @@ class DBConnection(object):
         if self._sessionmaker is None:
             self._sessionmaker = sessionmaker(bind=self._engine,
                                               autocommit=False)
-            versioned_session(self._sessionmaker)
         return self._sessionmaker()
 
     def _create_engine(self):

@@ -4,7 +4,8 @@
 Database objects for dns_zone
 """
 
-from lib.database.table import RenkiBase, RenkiUserDataTable
+from lib.database.user_data_table import RenkiUserDataTable
+from lib.database.table import RenkiBase
 from lib.validators import validate_user_id
 from lib import renki_settings as settings
 

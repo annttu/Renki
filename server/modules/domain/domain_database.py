@@ -4,7 +4,8 @@
 Domain objects database module
 """
 
-from lib.database.table import RenkiUserDataTable, RenkiBase
+from lib.database.user_data_table import RenkiUserDataTable
+from lib.database.table import RenkiBase
 from lib.database.tables import register_table
 from lib.validators import validate_user_id, validate_domain
 from sqlalchemy import Column, String, Integer, ForeignKey
