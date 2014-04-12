@@ -9,7 +9,7 @@ class PortGetValidator(InputParser):
 
 class PortAddValidator(InputParser):
     user_id = UserIDValidator('user_id')
-    server_group_id = IntegerValidator('server_group_id', positive = True, required = True)
+    service_group_id = IntegerValidator('service_group_id', positive = True, required = True)
 
 class PortIDValidator(InputParser):
     user_id = UserIDValidator('user_id')

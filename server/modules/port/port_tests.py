@@ -11,30 +11,52 @@ class TestPortsRoutine(tu.BasicTest):
     def setUp(self):
         super(TestPortsRoutine, self).setUp()
 
-        service = ServiceDatabase()
-        service.name = "TestService"
-        service.save()
+        hilla = ServerDatabase()
+        hilla.name = 'Hilla'
+        hilla.save()
         dbsession.commit()
 
-        self.sg = ServerGroupDatabase()
-        self.sg.name = "Lakka"
-        self.sg.service = service #.id
-        self.sg.save()
+        lakka = ServerDatabase()
+        lakka.name = 'Lakka'
+        lakka.save()
         dbsession.commit()
 
-        self.sg2 = ServerGroupDatabase()
-        self.sg2.name = "Hilla"
-        self.sg2.service = service #.id
-        self.sg2.save()
+        hilla_ports = ServiceGroupDatabase()
+        hilla_ports.name = 'Hilla_ports'
+        hilla_ports.type = 'port'
+        hilla_ports.save()
         dbsession.commit()
+
+        lakka_ports = ServiceGroupDatabase()
+        lakka_ports.name = 'Lakka_ports'
+        lakka_ports.type = 'port'
+        lakka_ports.save()
+        dbsession.commit()
+
+        hilla_port = ServiceDatabase()
+        hilla_port.name = 'Hilla_port'
+        hilla_port.service_group = hilla_ports
+        hilla_port.server = hilla
+        hilla_port.save()
+        dbsession.commit()
+
+        lakka_port = ServiceDatabase()
+        lakka_port.name = 'Lakka_port'
+        lakka_port.service_group = lakka_ports
+        lakka_port.server = hilla
+        lakka_port.save()
+        dbsession.commit()
+
+        self.sg = hilla_ports
+        self.sg2 = lakka_ports
 
     def create_port(self, user, sgid = None):
         port = PortDatabase()
         port.user_id = user
         if sgid is not None:
-            port.server_group_id = sgid
+            port.service_group_id = sgid
         else:
-            port.server_group_id = self.sg.id
+            port.service_group_id = self.sg.id
         port.port = 5678
         port.save()
         dbsession.commit()
@@ -58,8 +80,8 @@ class TestPortsRoutine(tu.BasicTest):
         self.assertQ('/ports/', user=u, status=tu.STATUS_OK)
 
     def test_ports_push_user_anon(self):
-        self.assertContainsNone(ServerGroupDatabase, ServerGroupDatabase.id == 123)
-        self.assertQ('/ports', user=None, method='POST', status=tu.STATUS_NOAUTH, args={'server_group_id': 123})
+        self.assertContainsNone(ServiceGroupDatabase, ServiceGroupDatabase.id == 123)
+        self.assertQ('/ports', user=None, method='POST', status=tu.STATUS_NOAUTH, args={'service_group_id': 123})
 
     def test_ports_push_user_noperms(self):
         u = self.user('test', [])
@@ -68,17 +90,17 @@ class TestPortsRoutine(tu.BasicTest):
 
     def test_ports_push_user_invalid_server(self):
         u = self.user('test', ['ports_add_own'])
-        self.assertContainsNone(ServerGroupDatabase, ServerGroupDatabase.id == 123)
-        self.assertQ('/ports', user=u, method='POST', status=tu.STATUS_NOTFOUND, args={'server_group_id': 123})
-        self.assertQ('/ports/', user=u, method='POST', status=tu.STATUS_NOTFOUND, args={'server_group_id': 123})
+        self.assertContainsNone(ServiceGroupDatabase, ServiceGroupDatabase.id == 123)
+        self.assertQ('/ports', user=u, method='POST', status=tu.STATUS_NOTFOUND, args={'service_group_id': 123})
+        self.assertQ('/ports/', user=u, method='POST', status=tu.STATUS_NOTFOUND, args={'service_group_id': 123})
         self.assertContainsNone(PortDatabase)
 
     def test_ports_push_user(self):
         u = self.user('test', ['ports_add_own'])
         self.assertContainsNone(PortDatabase, PortDatabase.user_id == u.user.id)
-        self.assertQ('/ports', user=u, method='POST', status=tu.STATUS_OK, args={'server_group_id': self.sg.id})
+        self.assertQ('/ports', user=u, method='POST', status=tu.STATUS_OK, args={'service_group_id': self.sg.id})
         self.assertContainsOne(PortDatabase, PortDatabase.user_id == u.user.id)
-        self.assertQ('/ports/', user=u, method='POST', status=tu.STATUS_OK, args={'server_group_id':self.sg.id})
+        self.assertQ('/ports/', user=u, method='POST', status=tu.STATUS_OK, args={'service_group_id':self.sg.id})
         self.assertContainsMany(PortDatabase, PortDatabase.user_id == u.user.id)
 
     def test_delete_anon(self):
@@ -137,7 +159,7 @@ class TestPortsRoutine(tu.BasicTest):
         self.assertQ('/%d/ports/' % (a.user.id + 1), user=a, status=tu.STATUS_NOTFOUND)
 
     def test_admin_ports_push_user_anon(self):
-        self.assertQ('/1/ports', user=None, method='POST', status=tu.STATUS_NOAUTH, args={'server_group_id': 123})
+        self.assertQ('/1/ports', user=None, method='POST', status=tu.STATUS_NOAUTH, args={'service_group_id': 123})
 
     def test_admin_ports_push_user_noperms(self):
         u = self.user('test', [])
@@ -146,21 +168,21 @@ class TestPortsRoutine(tu.BasicTest):
 
     def test_admin_ports_push_invalid_user(self):
         a = self.user('admiina', ['ports_add_all'])
-        self.assertQ('/%d/ports' % (a.user.id + 1), user=a, method='POST', status=tu.STATUS_NOTFOUND, args={'server_group_id': self.sg.id})
-        self.assertQ('/%d/ports/' % (a.user.id + 1), user=a, method='POST', status=tu.STATUS_NOTFOUND, args={'server_group_id': self.sg.id})
+        self.assertQ('/%d/ports' % (a.user.id + 1), user=a, method='POST', status=tu.STATUS_NOTFOUND, args={'service_group_id': self.sg.id})
+        self.assertQ('/%d/ports/' % (a.user.id + 1), user=a, method='POST', status=tu.STATUS_NOTFOUND, args={'service_group_id': self.sg.id})
 
     def test_admin_ports_push_user_invalid_server(self):
         u = self.user('test', [])
         a = self.user("admiina", ['ports_add_all'])
-        self.assertContainsNone(ServerGroupDatabase, ServerGroupDatabase.id == 123)
-        self.assertQ('/1/ports', user=a, method='POST', status=tu.STATUS_NOTFOUND, args={'server_group_id': 123})
-        self.assertQ('/1/ports/', user=a, method='POST', status=tu.STATUS_NOTFOUND, args={'server_group_id': 123})
+        self.assertContainsNone(ServiceGroupDatabase, ServiceGroupDatabase.id == 123)
+        self.assertQ('/1/ports', user=a, method='POST', status=tu.STATUS_NOTFOUND, args={'service_group_id': 123})
+        self.assertQ('/1/ports/', user=a, method='POST', status=tu.STATUS_NOTFOUND, args={'service_group_id': 123})
 
     def test_admin_ports_push_user(self):
         u = self.user('test', [])
         a = self.user("admiina", ['ports_add_all'])
-        self.assertQ('/1/ports', user=a, method='POST', status=tu.STATUS_OK, args={'server_group_id': self.sg.id})
-        self.assertQ('/1/ports/', user=a, method='POST', status=tu.STATUS_OK, args={'server_group_id': self.sg.id})
+        self.assertQ('/1/ports', user=a, method='POST', status=tu.STATUS_OK, args={'service_group_id': self.sg.id})
+        self.assertQ('/1/ports/', user=a, method='POST', status=tu.STATUS_OK, args={'service_group_id': self.sg.id})
 
     def test_admin_delete_anon(self):
         self.assertQ('/1/ports/1', user=None, method='DELETE', status=tu.STATUS_NOAUTH)

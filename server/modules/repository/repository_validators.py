@@ -9,7 +9,7 @@ class RepositoryGetValidator(InputParser):
 
 class RepositoryAddValidator(InputParser):
     user_id = UserIDValidator('user_id')
-    server_group_id = IntegerValidator('server_group_id', positive = True, required = True)
+    service_group_id = IntegerValidator('service_group_id', positive = True, required = True)
     name = StringValidator('name', required = True)
     type = ListValueValidator('type', allowed_values=['svn', 'git'], required = True)
 

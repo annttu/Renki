@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-
 from lib import check_settings
 from lib.database import basic_tables
-from lib.database.basic_tables import ServiceDatabase, ServerGroupDatabase
+from lib.database.basic_tables import ServiceDatabase, ServiceGroupDatabase, ServerDatabase
 from lib.database import tables
 from lib.database import connection
 from lib.database.connection import session as dbsession
@@ -92,33 +91,115 @@ def setup_development_users():
 
 def setup_development_servers():
     """
-    Add lakka and hilla servers and create service for them
+    Add lakka and hilla servers and create couple services and service groups
     """
-    if not ServiceDatabase.query().filter(ServiceDatabase.name == 'TestService').all():
-        service = ServiceDatabase()
-        service.name = 'TestService'
-        service.save()
-        dbsession.commit()
-    else:
-        service = ServiceDatabase.query().filter(ServiceDatabase.name == 'TestService').one()
-
-    if not ServerGroupDatabase.query().filter(ServerGroupDatabase.name == 'Lakka').all():
-        lakka = ServerGroupDatabase()
-        lakka.name = "Lakka"
-        lakka.service = service
-        lakka.save()
-        dbsession.commit()
-    else:
-        lakka = ServerGroupDatabase.query().filter(ServerGroupDatabase.name == 'Lakka').one()
-
-    if not ServerGroupDatabase.query().filter(ServerGroupDatabase.name == 'Hilla').all():
-        hilla = ServerGroupDatabase()
-        hilla.name = "Hilla"
-        hilla.service = service
+    if not ServerDatabase.query().filter(ServerDatabase.name == 'Hilla').all():
+        hilla = ServerDatabase()
+        hilla.name = 'Hilla'
         hilla.save()
         dbsession.commit()
     else:
-        hilla = ServerGroupDatabase.query().filter(ServerGroupDatabase.name == 'Hilla').one()
+        hilla = ServerDatabase.query().filter(ServerDatabase.name == 'Hilla').one()
+
+    if not ServerDatabase.query().filter(ServerDatabase.name == 'Lakka').all():
+        lakka = ServerDatabase()
+        lakka.name = 'Lakka'
+        lakka.save()
+        dbsession.commit()
+    else:
+        lakka = ServerDatabase.query().filter(ServerDatabase.name == 'Lakka').one()
+
+    if not ServerDatabase.query().filter(ServerDatabase.name == 'db1').all():
+        db1 = ServerDatabase()
+        db1.name = 'db1'
+        db1.save()
+        dbsession.commit()
+    else:
+        db1 = ServerDatabase.query().filter(ServerDatabase.name == 'db1').one()
+
+    if not ServerDatabase.query().filter(ServerDatabase.name == 'db2').all():
+        db2 = ServerDatabase()
+        db2.name = 'db2'
+        db2.save()
+        dbsession.commit()
+    else:
+        db2 = ServerDatabase.query().filter(ServerDatabase.name == 'db2').one()
+
+    if not ServiceGroupDatabase.query().filter(ServiceGroupDatabase.name == 'Hilla_ports').all():
+        hilla_ports = ServiceGroupDatabase()
+        hilla_ports.name = 'Hilla_ports'
+        hilla_ports.type = 'port'
+        hilla_ports.save()
+        dbsession.commit()
+    else:
+        hilla_ports = ServiceGroupDatabase.query().filter(ServiceGroupDatabase.name == 'Hilla_ports').one()
+
+    if not ServiceGroupDatabase.query().filter(ServiceGroupDatabase.name == 'Lakka_ports').all():
+        lakka_ports = ServiceGroupDatabase()
+        lakka_ports.name = 'Lakka_ports'
+        lakka_ports.type = 'port'
+        lakka_ports.save()
+        dbsession.commit()
+    else:
+        lakka_ports = ServiceGroupDatabase.query().filter(ServiceGroupDatabase.name == 'Lakka_ports').one()
+
+    if not ServiceGroupDatabase.query().filter(ServiceGroupDatabase.name == 'Mysql_databases').all():
+        mysql_databases = ServiceGroupDatabase()
+        mysql_databases.name = 'Mysql_databases'
+        mysql_databases.type = 'mysql_database'
+        mysql_databases.save()
+        dbsession.commit()
+    else:
+        mysql_databases = ServiceGroupDatabase.query().filter(ServiceGroupDatabase.name == 'Mysql_databases').one()
+
+    if not ServiceGroupDatabase.query().filter(ServiceGroupDatabase.name == 'Psql_databases').all():
+        psql_databases = ServiceGroupDatabase()
+        psql_databases.name = 'Psql_databases'
+        psql_databases.type = 'Psql_database'
+        psql_databases.save()
+        dbsession.commit()
+    else:
+        psql_databases = ServiceGroupDatabase.query().filter(ServiceGroupDatabase.name == 'Psql_databases').one()
+
+    if not ServiceDatabase.query().filter(ServiceDatabase.name == 'Mysql_database').all():
+        mysql_database = ServiceDatabase()
+        mysql_database.name = 'Mysql_Database'
+        mysql_database.service_group = mysql_databases
+        mysql_database.server = hilla
+        mysql_database.save()
+        dbsession.commit()
+    else:
+        mysql_database = ServiceDatabase.query().filter(ServiceDatabase.name == 'Mysql_database').one()
+
+    if not ServiceDatabase.query().filter(ServiceDatabase.name == 'Psql_database').all():
+        psql_database = ServiceDatabase()
+        psql_database.name = 'Psql_database'
+        psql_database.service_group = psql_databases
+        psql_database.server = hilla
+        psql_database.save()
+        dbsession.commit()
+    else:
+        psql_database = ServiceDatabase.query().filter(ServiceDatabase.name == 'Psql_database').one()
+
+    if not ServiceDatabase.query().filter(ServiceDatabase.name == 'Hilla_port').all():
+        hilla_port = ServiceDatabase()
+        hilla_port.name = 'Hilla_port'
+        hilla_port.service_group = hilla_ports
+        hilla_port.server = hilla
+        hilla_port.save()
+        dbsession.commit()
+    else:
+        hilla_port = ServiceDatabase.query().filter(ServiceDatabase.name == 'Hilla_port').one()
+
+    if not ServiceDatabase.query().filter(ServiceDatabase.name == 'Lakka_port').all():
+        lakka_port = ServiceDatabase()
+        lakka_port.name = 'Lakka_port'
+        lakka_port.service_group = lakka_ports
+        lakka_port.server = hilla
+        lakka_port.save()
+        dbsession.commit()
+    else:
+        lakka_port = ServiceDatabase.query().filter(ServiceDatabase.name == 'Lakka_port').one()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Admin util for renkiserver')

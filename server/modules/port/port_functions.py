@@ -1,7 +1,7 @@
 from .port_database import PortDatabase
 from lib.exceptions import AlreadyExist, Invalid, DoesNotExist
 from lib.validators import is_positive_numeric
-from lib.database.basic_tables import ServerGroupDatabase
+from lib.database.basic_tables import ServiceGroupDatabase
 from lib.database.connection import session as dbsession
 from lib.database.filters import do_limits
 from sqlalchemy import func
@@ -42,26 +42,26 @@ def get_port_by_id(port_id, user_id=None):
 
     raise DoesNotExist("Port id=%s does not exist" % port_id)
 
-def add_user_port(user_id, server_group_id):
+def add_user_port(user_id, service_group_id):
     try:
         Users.get(user_id)
     except DoesNotExist:
         raise
 
     try:
-        ServerGroupDatabase.get(server_group_id)
+        ServiceGroupDatabase.get(service_group_id)
     except DoesNotExist:
         raise
 
     try:
-        query = dbsession.query(func.max(PortDatabase.port)).filter(PortDatabase.server_group_id == server_group_id).group_by(PortDatabase.server_group_id)
+        query = dbsession.query(func.max(PortDatabase.port)).filter(PortDatabase.service_group_id == service_group_id).group_by(PortDatabase.service_group_id)
         portNumber = int(query.one()[0]) + 1
     except NoResultFound:
         portNumber = 1337
 
     port = PortDatabase()
     port.user_id = int(user_id)
-    port.server_group_id = int(server_group_id)
+    port.service_group_id = int(service_group_id)
     port.port = int(portNumber)
     port.save()
 
