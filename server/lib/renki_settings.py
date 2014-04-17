@@ -35,11 +35,6 @@ LOGGING = {
         }
     },
     'loggers': {
-        'routes': {
-            'handlers': ['console'],
-            'propagate': True,
-            'level': 'INFO',
-        },
         'server': {
             'handlers': ['console'],
             'propagate': True,
@@ -99,6 +94,11 @@ LOGGING = {
             'handlers' : ['console'],
             'propagate': True,
             'level': 'DEBUG',
+        },
+        'ticket': {
+            'handlers' : ['console'],
+            'propagate': True,
+            'level': 'INFO',
         }
      }
 }

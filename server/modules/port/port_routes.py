@@ -70,7 +70,9 @@ def ports_add(user):
     except Exception as e:
         logger.exception(e)
         raise RenkiHTTPError('Unknown error occured')
+
     dbconn.session.safe_commit()
+    print("SGID: " + str(port.get_service_group_id()))
     return ok(port.as_dict())
 
 @app.post('/<user_id:int>/ports')

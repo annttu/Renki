@@ -50,7 +50,7 @@ class RenkiTable(object):
         """
         raise Invalid("Dummy validator")
 
-    def delete(self, *args, **kwargs):
+    def delete(self):
         """
         Delete this object from database
         """
