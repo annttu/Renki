@@ -24,6 +24,9 @@ class DNSRecordDatabase(RenkiBase, RenkiUserDataTable):
     value = Column('value', String, nullable=False)
     priority = Column('priority', Integer, nullable=True, default=None)
 
+    soft_limit = 5
+    hard_limit = 10
+    
     def validate(self):
         # TODO: add validators
         pass
@@ -52,7 +55,10 @@ class DNSZoneDatabase(RenkiBase, RenkiUserDataTable):
 
     records = relationship('DNSRecordDatabase', uselist=True,
                            backref='dns_zone')
-
+    
+    soft_limit = 5
+    hard_limit = 10
+    
     def validate(self):
         # TODO: add validators
         pass

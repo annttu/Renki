@@ -10,12 +10,14 @@ from lib.database.basic_tables import ServiceGroupDatabase
 
 class PortDatabase(RenkiBase, RenkiUserDataTable):
     __tablename__ = 'port'
-    user_id = Column('user_id', Integer, ForeignKey("users.id"), nullable=False)
     port = Column('port', Integer, nullable=False)
     service_group_id = Column(Integer, ForeignKey('service_group.id'))
     service_group = relationship(ServiceGroupDatabase, backref="ports")
     __table_args__ = (UniqueConstraint('service_group_id', 'port'),)
 
+    soft_limit = 5
+    hard_limit = 10
+    
     def validate(self):
         return True
 

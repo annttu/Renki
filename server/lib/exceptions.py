@@ -47,8 +47,15 @@ class AuthenticationFailed(RenkiHTTPError):
     STATUS = 401
     pass
 
-class PermissionDenied(AuthenticationFailed):
+class PermissionDenied(RenkiHTTPError):
+    STATUS = 403
     pass
 
 class SettingError(RenkiException):
+    pass
+
+class SoftLimitReached(RenkiException):
+    pass
+
+class HardLimitReached(RenkiException):
     pass

@@ -8,7 +8,8 @@ from lib.database import tables
 from lib.database import connection
 from lib.database.connection import session as dbsession
 from lib.auth import permissions
-#from lib.database.connection import DBConnection
+from lib.database.user_data_table import RenkiUserDataTable
+
 # Import modules to get all tables registered
 import modules
 from lib.auth import db
@@ -38,6 +39,19 @@ def create_tables():
     connection.conn.create_tables()
     logger.info("All tables created")
 
+def create_limits():
+    """
+    Crate limits for UserDataTables
+    """
+    for table in tables.TABLES:
+        if issubclass(table, RenkiUserDataTable):
+            logger.info("Creating default limits for table: %s" % (table.__tablename__))
+            limit = db.DefaultLimits()
+            limit.table = table.__tablename__
+            limit.soft_limit = table.soft_limit
+            limit.hard_limit = table.hard_limit
+            limit.save()
+
 def drop_tables():
     """
     Create database tables
@@ -51,12 +65,14 @@ def drop_tables():
     logger.info("All tables dropped")
 
 def create_permissions():
+    logger.info("Creating permissions")
     for permission in permissions.PERMISSIONS:
         if not db.Permissions.query().filter(
                                     db.Permissions.name == permission).all():
             p = db.Permissions()
             p.name = permission
             p.save()
+    logger.info("Permissions created")
 
 
 def add_user(userid, username, password, firstnames, lastname):
@@ -214,6 +230,7 @@ if __name__ == '__main__':
         init()
         create_tables()
         create_permissions()
+        create_limits();
     elif args.development_setup is True:
         init()
         setup_development_users()

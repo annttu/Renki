@@ -40,6 +40,11 @@ LOGGING = {
             'propagate': True,
             'level': 'INFO',
         },
+        'admin': {
+            'handlers': ['console'],
+            'propagate': True,
+            'level': 'INFO',
+        },
         'login_routes': {
             'handlers': ['console'],
             'propagate': True,
@@ -70,35 +75,35 @@ LOGGING = {
             'propagate': True,
             'level': 'DEBUG',
         },
-        'database': {
-            'handlers' : ['console'],
-            'propagate': True,
-            'level': 'DEBUG',
-        },
-        'dns_zone': {
-            'handlers': ['console'],
-            'propagate': True,
-            'level': 'DEBUG',
-        },
-        'domain': {
-            'handlers' : ['console'],
-            'propagate': True,
-            'level': 'DEBUG',
-        },
-        'port': {
-            'handlers': ['console'],
-            'propagate': True,
-            'level': 'DEBUG',
-        },
-        'repository': {
-            'handlers' : ['console'],
-            'propagate': True,
-            'level': 'DEBUG',
-        },
         'ticket': {
             'handlers' : ['console'],
             'propagate': True,
             'level': 'INFO',
+        },
+        'module_database': {
+            'handlers' : ['console'],
+            'propagate': True,
+            'level': 'DEBUG',
+        },
+        'module_dns_zone': {
+            'handlers': ['console'],
+            'propagate': True,
+            'level': 'DEBUG',
+        },
+        'module_domain': {
+            'handlers' : ['console'],
+            'propagate': True,
+            'level': 'DEBUG',
+        },
+        'module_port': {
+            'handlers': ['console'],
+            'propagate': True,
+            'level': 'DEBUG',
+        },
+        'module_repository': {
+            'handlers' : ['console'],
+            'propagate': True,
+            'level': 'DEBUG',
         }
      }
 }

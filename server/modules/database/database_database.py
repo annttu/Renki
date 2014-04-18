@@ -15,9 +15,12 @@ class DatabaseDatabase(RenkiBase, RenkiUserDataTable):
     user_id = Column('user_id', Integer, ForeignKey("users.id"), nullable=False)
     type = Column('type', types.Enum('mysql', 'postgresql', name='database_types', native_enum=True), nullable=False)
     service_group_id = Column(Integer, ForeignKey('service_group.id'))
-    service_group = relationship(ServiceGroupDatabase, backref="databasis")
+    service_group = relationship(ServiceGroupDatabase, backref="databases")
     __table_args__ = (UniqueConstraint('service_group_id', 'name', 'type'),)
 
+    soft_limit = 5
+    hard_limit = 10
+    
     def validate(self):
         if len(self.name) > 50:
             raise Invalid('Database name too long')

@@ -212,3 +212,31 @@ class PermissionGroups(RenkiBase, RenkiTable):
 
 register_table(PermissionGroups)
 
+class DefaultLimits(RenkiBase, RenkiTable):
+    """
+    Database table for limits
+    """
+    __tablename__ = 'default_limits'
+    table = Column('table', Unicode, nullable=False)
+    soft_limit = Column('soft_limit', Integer)
+    hard_limit = Column('hard_limit', Integer)
+
+    def validate(self):
+        return True
+register_table(DefaultLimits)
+
+class Limits(RenkiBase, RenkiTable):
+    """
+    Database table for limits
+    """
+    __tablename__ = 'limits'
+    user_id = Column('users_id', Integer, ForeignKey('users.id'))
+    table = Column('table', Unicode, nullable=False)
+    soft_limit = Column('soft_limit', Integer)
+    hard_limit = Column('hard_limit', Integer)
+    relationship(Users, backref="limits")
+
+    def validate(self):
+        return True
+        
+register_table(Limits)

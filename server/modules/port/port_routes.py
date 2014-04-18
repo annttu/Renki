@@ -4,14 +4,14 @@
 from bottle import request
 from lib.auth.func import require_perm
 from lib.database import connection as dbconn
-from lib.exceptions import DatabaseError, RenkiHTTPError, DoesNotExist, Invalid
+from lib.exceptions import DatabaseError, RenkiHTTPError, DoesNotExist, Invalid, SoftLimitReached, HardLimitReached, PermissionDenied
 from lib.renki import app
 from lib.utils import ok, error
 from .port_functions import get_user_ports, add_user_port, get_port_by_id
 from .port_validators import PortGetValidator, PortAddValidator, PortIDValidator
-
+from .port_database import PortDatabase
 import logging
-logger = logging.getLogger('port')
+logger = logging.getLogger('module_port')
 
 @app.get('/ports')
 @app.get('/ports/')
@@ -58,6 +58,19 @@ def ports_add(user):
     """
     POST /ports
     """
+    wait = False
+    try:
+        PortDatabase.validate_add(user, user.user_id)
+    except SoftLimitReached as e:
+        wait = True
+        pass
+    except HardLimitReached as e:
+        logger.exception(e)
+        raise PermissionDenied('Not allowed to create more ports')
+    except Exception as e:
+        logger.exception(e)
+        raise RenkiHTTPError('Unknown error occured')
+
     data = request.json
     if not data:
         data = dict(request.params.items())
@@ -70,9 +83,8 @@ def ports_add(user):
     except Exception as e:
         logger.exception(e)
         raise RenkiHTTPError('Unknown error occured')
-
+    port.waiting = wait
     dbconn.session.safe_commit()
-    print("SGID: " + str(port.get_service_group_id()))
     return ok(port.as_dict())
 
 @app.post('/<user_id:int>/ports')
