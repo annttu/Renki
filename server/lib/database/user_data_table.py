@@ -1,11 +1,8 @@
 from lib.database.connection import session as dbsession
 from lib.history_meta import Versioned
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm.exc import NoResultFound
-from sqlalchemy.exc import SQLAlchemyError
-from datetime import datetime
 from lib.database.table import RenkiDataTable
 from sqlalchemy.ext.declarative import declared_attr
 from lib.communication.ticket_tables import TicketGroupDatabase
@@ -35,7 +32,8 @@ class RenkiUserDataTable(RenkiDataTable, Versioned):
         return RenkiDataTable.save(self, commit)
 
     def save(self, commit=False):
-        create_ticket(self)
+        if not self.waiting:
+            create_ticket(self)
         return RenkiDataTable.save(self, commit)
 
     def delete(self):

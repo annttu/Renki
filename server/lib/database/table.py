@@ -74,12 +74,25 @@ class RenkiTable(object):
         """
         ret = {}
         for i in self.__table__.columns.keys():
-            if i in ['timestamp']:
+            if getattr(self, i).__class__.__name__ in ['datetime']:
                 ret[i] = str(getattr(self, i))
             elif i not in ['deleted']:
                 ret[i] = getattr(self, i)
         return ret
 
+    # Variation of as_dict mainly to work with automagic history tables which don't have __table__
+    def to_dict(self):
+        """
+        Return this object columns as dict object
+        """
+        ret = {}
+        for i in vars(self):
+            if i[0] != '_':
+                if getattr(self, i).__class__.__name__ in ['datetime']:
+                    ret[i] = str(getattr(self, i))
+                elif i not in ['deleted']:
+                    ret[i] = getattr(self, i)
+        return ret
 
 class RenkiDataTable(RenkiTable):
     # Every data table have comment, deleted and timestamp columns

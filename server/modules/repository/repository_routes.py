@@ -12,11 +12,11 @@ from .repository_validators import RepositoryGetValidator, RepositoryAddValidato
 from .repository_functions import get_user_repositories, add_user_repository, get_repository_by_id
 
 import logging
-logger = logging.getLogger('repository')
+logger = logging.getLogger('module_repository')
 
 @app.get('/repositories')
 @app.get('/repositories/')
-@require_perm(permission = 'repositories_view_own')
+@require_perm(permission='repositories_view_own')
 def repositories_index(user):
     """
     GET /repositories
@@ -36,7 +36,7 @@ def repositories_index(user):
 
 @app.get('/repositories/<type>/<repo_id:int>')
 @app.get('/repositories/<type>/<repo_id:int>/')
-@require_perm(permission = 'repositories_view_own')
+@require_perm(permission='repositories_view_own')
 def repositories_get_repository(user, type, repo_id):
     """
     GET /repositories/<type>/<id>
@@ -56,7 +56,7 @@ def repositories_get_repository(user, type, repo_id):
 
 @app.post('/repositories/<type>')
 @app.post('/repositories/<type>/')
-@require_perm(permission = 'repositories_modify_own')
+@require_perm(permission='repositories_modify_own')
 def repositories_add_repository(user, type):
     """
     POST /repositories/<type>
@@ -79,7 +79,7 @@ def repositories_add_repository(user, type):
 
 @app.delete('/repositories/<type>/<repo_id:int>')
 @app.delete('/repositories/<type>/<repo_id:int>/')
-@require_perm(permission = 'repositories_modify_own')
+@require_perm(permission='repositories_modify_own')
 def repositories_delete_repository(user, type, repo_id):
     """
     DELETE /repositories/<type>/<id>

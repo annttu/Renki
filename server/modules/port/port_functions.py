@@ -66,3 +66,21 @@ def add_user_port(user_id, service_group_id):
     port.save()
 
     return port
+
+def get_port_history(user_id=None, limit=None, offset=None):
+    PortHistory = PortDatabase.__history_mapper__.class_
+    query = PortHistory.query()
+
+    if user_id is not None:
+        try:
+            Users.get(user_id)
+        except DoesNotExist:
+            raise
+        query = query.filter(PortHistory.user_id == user_id)
+
+    query = query.filter(PortHistory.user_id == user_id)
+    query = do_limits(query, limit, offset)
+    return query.all()
+
+def get_user_port_history(user_id, limit=None, offset=None):
+    return get_port_history(user_id = user_id, limit = limit, offset = offset)
