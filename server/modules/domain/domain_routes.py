@@ -17,7 +17,7 @@ from lib.exceptions import AlreadyExist, DatabaseError, RenkiHTTPError, \
     DoesNotExist
 
 import logging
-logger = logging.getLogger('database')
+logger = logging.getLogger('module_domain')
 
 
 @app.get('/domains/')

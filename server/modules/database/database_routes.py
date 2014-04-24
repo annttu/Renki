@@ -10,7 +10,7 @@ from lib.renki import app
 from lib.utils import ok, error
 
 import logging
-logger = logging.getLogger('database')
+logger = logging.getLogger('module_database')
 
 @app.get('/databases')
 @app.get('/databases/')

@@ -5,7 +5,6 @@ from sqlalchemy import Table, Column, ForeignKeyConstraint, Integer, DateTime
 from sqlalchemy import event
 import datetime
 from sqlalchemy.orm.properties import RelationshipProperty
-#from lib.communication.ticket import create_ticket
 
 def col_references_table(col, table):
     for fk in col.foreign_keys:
@@ -200,8 +199,6 @@ def create_version(obj, session, deleted=False):
     session.add(hist)
     obj.version += 1
 
-    #create_ticket(obj.service_group_id, str(obj.as_dict()), str(attr))
-
 def versioned_session(session):
     @event.listens_for(session, 'before_flush')
     def before_flush(session, flush_context, instances):
@@ -209,7 +206,3 @@ def versioned_session(session):
             create_version(obj, session)
         for obj in versioned_objects(session.deleted):
             create_version(obj, session, deleted=True)
-    #@event.listens_for(session, 'after_flush')
-    #def after_flush(session, flush_context):
-    #    for obj in versioned_objects(session.new):
-    #        create_ticket(obj.service_group_id, str(obj.as_dict()), '')
