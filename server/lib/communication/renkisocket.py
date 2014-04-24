@@ -20,15 +20,16 @@ class MsgTypes:
 
 
 class RenkiSocketConnection(threads.RenkiThread):
-    def __init__(self, sock, address):
+    def __init__(self, sock, address, sslcontext=None):
         threads.RenkiThread.__init__(self)
         self.sock = sock
+        self.sslcontext = sslcontext
         self.beat_interval = 5
         self.address = address
         self.sock.setblocking(False)
         self.sock.settimeout(1)
         # Tune keepalive
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 3)
         # TCP_KEEPX options works only in Linux :/
         #self.sock.setsockopt(socket.SOL_TCP, socket.TCP_KEEPIDLE, 1)
         #self.sock.setsockopt(socket.SOL_TCP, socket.TCP_KEEPINTVL, 1)
@@ -38,6 +39,8 @@ class RenkiSocketConnection(threads.RenkiThread):
         msg = []
         closed = False
         error = False
+        if not self.sock:
+            return
         while not self.is_stopped() and len(msg) < 1048576:
             try:
                 m = self.sock.recv(10240)
@@ -46,6 +49,7 @@ class RenkiSocketConnection(threads.RenkiThread):
                     msg.append(m.decode("utf-8"))
                 elif len(msg) == 0:
                     # Socket is closed if message is 0 bytes long
+                    logger.debug("Got msg with length 0")
                     closed = True
                     break
                 else:
@@ -85,6 +89,7 @@ class RenkiSocketConnection(threads.RenkiThread):
         try:
             logger.debug("%s: Closing socket" % str(self))
             s = self.sock
+            self._sock = None
             self.sock = None
             s.setblocking(False)
             s.shutdown(socket.SHUT_RDWR)
@@ -103,6 +108,14 @@ class RenkiSocketConnection(threads.RenkiThread):
         logger.info("%s: Got message %s" % (str(self), msg))
 
     def run(self):
+        try:
+            if self.sslcontext:
+                self.sock = self.sslcontext.wrap_socket(self.sock, server_side=True)
+            else:
+                self.sock = self._sock
+        except Exception as e:
+            logger.exception(e)
+            return
         while not self.is_stopped():
             #try:
             #    self.heartbeat()
@@ -134,7 +147,7 @@ class RenkiSocketConnection(threads.RenkiThread):
                     logger.exception(e)
                     logger.error("%s: Cannot handle message %s" % (str(self), msg))
                     break
-            self.close()
+        self.close()
 
     def __str__(self):
         return "RenkiSocket %s:%s" % self.address
@@ -152,8 +165,8 @@ class RenkiSocket(object):
             return
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sock.bind((settings.RENKISRV_LISTEN_ADDRESS,
-                        settings.RENKISRV_LISTEN_PORT))
+            self.sock.bind((settings.RENKISRV_SOCKET_ADDRESS,
+                        settings.RENKISRV_SOCKET_PORT))
             self.sock.listen(5)
         except Exception as e:
             self.sock = None
@@ -200,11 +213,19 @@ class RenkiSocket(object):
                 logger.error("Socket in use, waiting to free")
                 time.sleep(2)
         try:
+            if settings.RENKISRV_SOCKET_SSL:
+                sslcontext = ssl.SSLContext(ssl.PROTOCOL_SSLv3)
+                print("KEY: %s" % settings.RENKISRV_SOCKET_KEY)
+                sslcontext.load_cert_chain(certfile=settings.RENKISRV_SOCKET_CERT,
+                                           keyfile=settings.RENKISRV_SOCKET_KEY)
+            else:
+                sslcontext = None
             while True:
                 self.handle_threads()
                 (clientsocket, address) = self.sock.accept()
                 print("Connection from %s" % str(address))
-                t = RenkiSocketConnection(clientsocket, address)
+                t = RenkiSocketConnection(clientsocket, address,
+                                          sslcontext=sslcontext)
                 t.start()
                 self.threads.append(t)
         except KeyboardInterrupt as e:
