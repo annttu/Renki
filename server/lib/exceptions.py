@@ -22,6 +22,8 @@ class RenkiHTTPError(HTTPError):
         super(RenkiHTTPError, self).__init__(status=self.STATUS,
                                              exception=exception)
 
+class Stopped(RenkiException):
+    pass
 
 class Invalid(RenkiHTTPError):
     STATUS = 400
@@ -58,4 +60,13 @@ class SoftLimitReached(RenkiException):
     pass
 
 class HardLimitReached(RenkiException):
+    pass
+
+class RenkiSocketError(RenkiException):
+    pass
+
+class RenkiSocketTimeout(RenkiException):
+    pass
+
+class RenkiSocketClosed(RenkiException):
     pass

@@ -104,7 +104,17 @@ LOGGING = {
             'handlers' : ['console'],
             'propagate': True,
             'level': 'DEBUG',
-        }
+        },
+        'tickets_done': {
+            'handlers' : ['console'],
+            'propagate': True,
+            'level': 'DEBUG',
+        },
+        'RenkiSocket': {
+            'handlers' : ['console'],
+            'propagate': True,
+            'level': 'DEBUG',
+        },
      }
 }
 
@@ -123,5 +133,11 @@ DB_TEST_USER = 'renki'
 DB_TEST_PASSWORD = ''
 DB_TEST_SERVER = 'localhost'
 DB_TEST_PORT = 5432
+RENKISRV_LISTEN_ADDRESS = '0.0.0.0'
+RENKISRV_LISTEN_PORT = 6550
+RENKISRV_LISTEN_SSL = True
+RENKISRV_LISTEN_CERT = REQUIRED
+RENKISRV_LISTEN_KEY = REQUIRED
+RENKISRV_LISTEN_CA = None
 KEY_EXPIRE_TIME = 86400
 AUTH_SECRET = REQUIRED
