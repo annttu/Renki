@@ -53,9 +53,6 @@ class PermissionDenied(RenkiHTTPError):
     STATUS = 403
     pass
 
-class SettingError(RenkiException):
-    pass
-
 class SoftLimitReached(RenkiException):
     pass
 

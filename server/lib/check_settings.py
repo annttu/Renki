@@ -1,7 +1,6 @@
 # encoding: utf-8
 
 import settings
-from .exceptions import SettingError
 
 import logging
 import logging.config
@@ -30,17 +29,19 @@ def set_settings():
     Populate renki_settings module with values set in settings.py and
     local_settings.py
     """
+    ignored = ['Condition', 'REQUIRED', 'REQUIREDIF', 'CHECKVALUE',
+               'SettingError']
     # Copy obvious values
     defaults = vars(rsettings).copy()
     for name, default in defaults.items():
-        if name.startswith('__') or name in ['REQUIRED']:
+        if name.startswith('__') or name in ignored or isinstance(default, type):
             continue
         value = getattr(settings, name, None)
-        if default == rsettings.REQUIRED and value is None:
-            raise SettingError("%s is required setting" % name)
+        if issubclass(default.__class__, rsettings.Condition):
+            value = default.check(rsettings, value)
         elif value is None:
             continue
-        setattr(rsettings, name, getattr(settings, name))
+        setattr(rsettings, name, value)
 
     # Import authentication module
     rsettings.AUTHENTICATION_MODULES = import_modules(
