@@ -14,13 +14,15 @@ import random
 
 
 #logging.basicConfig()
+logging.getLogger().setLevel(logging.DEBUG)
 logger = logging.getLogger("RenkiSocket")
 logger.setLevel(logging.DEBUG)
+
 
 # Default settings
 
 settings.RENKISRV_SOCKET_ADDRESS = '127.0.0.1'
-settings.RENKISRV_SOCKET_PORT = random.randint(60000, 65000)
+settings.RENKISRV_SOCKET_PORT = random.randint(60000, 64000)
 settings.RENKISRV_SOCKET_CERT = os.path.join(os.path.dirname(__file__), 
                                                    'ssl/server.crt')
 settings.RENKISRV_SOCKET_KEY = os.path.join(os.path.dirname(__file__), 
@@ -102,6 +104,8 @@ class RenkiSocketClient(object):
 class TestRenkiSocketBasic(BasicTest):
 
     def setUp(self):
+        #Closing socket and opening new with same port is too slow!
+        settings.RENKISRV_SOCKET_PORT = random.randint(60000, 64000)
         self.socket = RenkiSocket()
         self.client = RenkiSocketClient()
         self.socket.start()
@@ -151,11 +155,44 @@ class TestRenkiSocketBasic(BasicTest):
 
     def test_invalid_input(self):
         self.client.send("asdf")
-        
+        try:
+            msg = self.client.recv()
+        except Exception as e:
+            self.fail("Invalid message shouldn't return exception")
+        if msg['type'] != MsgTypes.ERROR:
+            self.fail("Server response wasn't ERROR")
 
     def tearDown(self):
-        self.socket.stop()
         self.client.close()
+        self.socket.stop()
+
+
+class TestRenkiSocketServer(BasicTest):
+    def setUp(self):
+        #Closing socket and opening new with same port is too slow!
+        settings.RENKISRV_SOCKET_PORT = random.randint(60000, 64000)
+        self.socket = RenkiSocket()
+        self.client = RenkiSocketClient()
+        self.socket.start()
+
+    def test_send_message(self):
+        time.sleep(5)
+        self.client.connect()
+        if len(self.socket.threads) < 1:
+            self.fail("Number of threads (%s) is not correct, should be 1" %
+                      (len(self.socket.threads),))
+        s = self.socket.threads[0]
+        s.send({'id': 1, 'type': MsgTypes.HELLO})
+        try:
+            msg = self.client.recv()
+        except Exception as e:
+            self.fail("receiving message shouldn't return exception")
+        if msg['type'] != MsgTypes.HELLO:
+            self.fail("Server response wasn't HELLO")
+
+    def tearDown(self):
+        self.client.close()
+        self.socket.stop()
 
 if __name__ == "__main__":
     import unittest

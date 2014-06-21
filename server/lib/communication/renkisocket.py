@@ -16,11 +16,14 @@ logger = logging.getLogger("RenkiSocket")
 
 
 class MsgTypes(object):
-    OK = 1
-    ERROR = 2
-    HELLO = 3
-    ACL = 4
-    TICKET = 6
+    """
+    Enum for different message types.
+    """
+    OK = 1 # Status ok, continue
+    ERROR = 2 # Error occured
+    HELLO = 3 # Message sent on begin of every new connection
+    ACL = 4 # Message received
+    TICKET = 6 # Message contains ticket
     NOP = 99 # For timeout testing
 
     @property
@@ -36,6 +39,9 @@ class MsgTypes(object):
 MsgTypes = MsgTypes()
 
 class MessageStates(object):
+    """
+    State of message
+    """
     NotSent = 1
     WaitingOK = 2
     Sent = 3
@@ -43,6 +49,9 @@ class MessageStates(object):
 MessageStates = MessageStates()
 
 class Message(object):
+    """
+    Internal object for message.
+    """
     def __init__(self, msg):
         self.msg = msg
         self._state = MessageStates.NotSent
@@ -61,6 +70,10 @@ class Message(object):
 
 
 class RenkiSocketConnection(threads.RenkiThread):
+    """
+    RenkiSocketConnection handles connections received from clients.
+    One thread per connection.
+    """
     def __init__(self, sock, address, sslcontext=None):
         threads.RenkiThread.__init__(self)
         self.sock = sock
@@ -152,7 +165,7 @@ class RenkiSocketConnection(threads.RenkiThread):
         # TODO: wait for OK
 
     def send(self, msg):
-        msg = (Message(msg)
+        msg = Message(msg)
         self.send_queue.append(msg)
         return msg
 
@@ -168,7 +181,7 @@ class RenkiSocketConnection(threads.RenkiThread):
         return
 
     def respond_error(self, msg_id=None, reason=None):
-        msg = {'type': 'ERROR'}
+        msg = {'type': MsgTypes.ERROR}
         if msg_id:
             msg['id'] = msg_id
         if reason:
@@ -220,9 +233,25 @@ class RenkiSocketConnection(threads.RenkiThread):
         self.respond_ok(msg_id = msg_id, status="Dummy")
 
     def handle_sent(self):
-        for msg
+        """
+        Send waiting messages to remote.
+        """
+        for msg in self.send_queue:
+            if msg.is_sent():
+                continue
+            try:
+                self._send(msg.msg)
+                msg.mark_sent()
+            except Exception as e:
+                logger.exception(e)
+                logger.error("Cannot send message to %s" % str(self))
+                return False
+        return True
 
     def handle_recv(self):
+        """
+        Receive waiting messages from socket.
+        """
         logger.debug("%s: Waiting for data" % str(self))
         try:
             msg = self.recv()
@@ -270,7 +299,10 @@ class RenkiSocketConnection(threads.RenkiThread):
 
 
 class RenkiSocket(threads.RenkiThread):
-#class RenkiSocket(object):
+    """
+    Connection manager object. Manages RenkiSocketConnections and handles 
+    new connections.
+    """
     def __init__(self):
         threads.RenkiThread.__init__(self)
         self.sock = None
@@ -309,6 +341,9 @@ class RenkiSocket(threads.RenkiThread):
         if self.sock:
             try:
                 self.sock.shutdown(socket.SHUT_RD)
+            except Exception as e:
+                logger.exception(e)
+            try:
                 self.sock.close()
             except Exception as e:
                 logger.exception(e)

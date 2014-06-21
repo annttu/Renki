@@ -1,3 +1,5 @@
+# encoding: utf-8
+
 from lib.communication.ticket_tables import TicketGroupDatabase, TicketDatabase
 from lib.database import connection as dbconn
 from lib.database.basic_tables import ServiceGroupDatabase, ServerDatabase, ServiceDatabase
